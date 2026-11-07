@@ -26,3 +26,5 @@
 
 
 .class-schedule-picker{margin:18px 0}.class-schedule-picker fieldset{border:0;padding:0;margin:0 0 16px;min-width:0}.class-schedule-picker legend{font-size:13px;font-weight:600;margin-bottom:9px}.weekday-choices{display:flex;flex-wrap:wrap;gap:8px}.weekday-choices label{display:flex;align-items:center;gap:7px;padding:10px 12px;border:1px solid #d8e1ed;border-radius:9px;cursor:pointer}.weekday-choices label:has(input:checked){background:#edf4ff;border-color:#2861a5}.weekday-choices input{width:18px;height:18px;margin:0;accent-color:#134c9c}.time-choices{display:flex;align-items:center;gap:8px}.time-choices select{width:100%;min-width:0;padding:10px;border:1px solid #d8e1ed;border-radius:8px;background:#fff;color:#142b48}
+
+.stat-shortcut{text-align:left;font:inherit;color:inherit;width:100%}.stat-shortcut:enabled{cursor:pointer}.stat-shortcut:enabled:hover,.stat-shortcut:focus-visible{outline:2px solid #134c9c;outline-offset:2px}.stat-shortcut:disabled{opacity:1;cursor:default}

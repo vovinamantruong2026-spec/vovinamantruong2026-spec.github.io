@@ -36,7 +36,20 @@ service cloud.firestore {
   }
   function reserved(r) { return r.kind != 'student' || getAfter(/databases/$(database)/documents/clubs/antruong-v2/studentCodes/$('code-' + r.data.id.lower())).data.studentUid == r.id; }
   function restoring() { return owner() && maintenance(); }
-  function trashAllowed(r) { return owner() || (r.data.get('deleted',false) == false && (resource == null || resource.data.data.get('deleted',false) == false)); }
+  function reviewScope(cid) { let a = me(); return live(a) && !maintenance() && inClass(a,cid) && has(a,'approvals_manage'); }
+  function approvedStudentDeletion(r) {
+   let before = resource.data;
+   let ref = /databases/$(database)/documents/clubs/antruong-v2/deletionRequests/$(r.data.get('deletionRequestId','missing'));
+   let old = get(ref).data;
+   let decision = getAfter(ref).data;
+   return r.kind == 'student' && reviewScope(before.data.classId) &&
+    before.data.get('deleted',false) == false && r.data.deleted == true &&
+    r.data.diff(before.data).affectedKeys().hasOnly(['deleted','deletedAt','deletedBy','deletionRequestId']) &&
+    r.data.deletedBy == me().name && r.data.deletedAt is string &&
+    old.status == 'pending' && old.studentUid == r.id && old.classId == before.data.classId && old.targetVersion == before.version &&
+    decision.status == 'approved' && decision.reviewedBy == request.auth.uid && decision.reviewedAt == request.time;
+  }
+  function trashAllowed(r) { return (r.kind == 'student' && r.data.get('deleted',false) == true && (resource == null || resource.data.data.get('deleted',false) == false) ? (resource != null && approvedStudentDeletion(r)) : owner()) || (r.data.get('deleted',false) == false && (resource == null || resource.data.data.get('deleted',false) == false)); }
   function valid(r) {
    return r.keys().hasOnly(['kind','id','data','version','updatedAt','auditId','imported']) &&
     r.kind in ['student','class','attendance','tuition','gear','tournament','approval','config','account'] &&
@@ -61,6 +74,28 @@ service cloud.firestore {
     operation.recordKey == key && operation.actorUid == request.auth.uid && operation.at == request.time &&
     event.actorUid == request.auth.uid && event.action == 'purge' && event.kind == r.kind && event.record_id == r.id && event.at == request.time;
   }
+  match /clubs/antruong-v2/deletionRequests/{id} {
+   function target() { return get(/databases/$(database)/documents/clubs/antruong-v2/records/$('student--' + request.resource.data.studentUid)).data; }
+   allow get: if active() && (!exists(/databases/$(database)/documents/clubs/antruong-v2/deletionRequests/$(id)) || (inClass(me(),resource.data.classId) && (has(me(),'students_direct') || has(me(),'approvals_manage'))));
+   allow list: if active() && inClass(me(),resource.data.classId) && (has(me(),'students_direct') || has(me(),'approvals_manage'));
+   allow create: if active() && !maintenance() && has(me(),'students_direct') && inClass(me(),request.resource.data.classId) &&
+    request.resource.data.keys().hasOnly(['studentUid','studentName','classId','targetVersion','requestedBy','requesterName','status','createdAt']) &&
+    request.resource.data.studentUid is string && request.resource.data.targetVersion is int &&
+    id == request.resource.data.studentUid + '_' + string(request.resource.data.targetVersion) &&
+    request.resource.data.status == 'pending' && request.resource.data.requestedBy == request.auth.uid &&
+    request.resource.data.requesterName == me().name && request.resource.data.createdAt == request.time &&
+    target().kind == 'student' && target().data.get('deleted',false) == false &&
+    target().data.classId == request.resource.data.classId && target().data.name == request.resource.data.studentName && target().version == request.resource.data.targetVersion;
+   allow update: if reviewScope(resource.data.classId) && resource.data.status == 'pending' &&
+    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','reviewedBy','reviewerName','reviewedAt']) &&
+    request.resource.data.status in ['approved','rejected'] && request.resource.data.reviewedBy == request.auth.uid &&
+    request.resource.data.reviewerName == me().name && request.resource.data.reviewedAt == request.time &&
+    (request.resource.data.status == 'rejected' || (
+     getAfter(/databases/$(database)/documents/clubs/antruong-v2/records/$('student--' + resource.data.studentUid)).data.data.deleted == true &&
+     getAfter(/databases/$(database)/documents/clubs/antruong-v2/records/$('student--' + resource.data.studentUid)).data.data.deletionRequestId == id &&
+     getAfter(/databases/$(database)/documents/clubs/antruong-v2/records/$('student--' + resource.data.studentUid)).data.version == resource.data.targetVersion + 1));
+   allow delete: if false;
+  }
   match /clubs/antruong-v2/members/{email} {
    allow get: if signed() && (email == request.auth.token.email.lower() || owner());
    allow list: if owner();
@@ -74,7 +109,8 @@ service cloud.firestore {
    allow get: if active() && (!exists(/databases/$(database)/documents/clubs/antruong-v2/records/$(key)) || readRecord(resource.data));
    allow list: if owner() || readRecord(resource.data);
    allow create: if key == request.resource.data.kind + '--' + request.resource.data.id && valid(request.resource.data) && writeRecord(request.resource.data) && trashAllowed(request.resource.data) && (reserved(request.resource.data) || (owner() && request.resource.data.get('imported',false) == true && !exists(/databases/$(database)/documents/clubs/antruong-v2/meta/studentCodes))) && request.resource.data.version == 1 && ((owner() && request.resource.data.get('imported',false) == true) || hasAudit(request.resource.data));
-   allow update: if key == request.resource.data.kind + '--' + request.resource.data.id && valid(request.resource.data) && writeRecord(resource.data) && writeRecord(request.resource.data) && trashAllowed(request.resource.data) && !(resource.data.kind == 'account' && resource.data.data.get('isSuperAdmin',false) == true) && reserved(request.resource.data) && request.resource.data.id == resource.data.id && request.resource.data.kind == resource.data.kind && request.resource.data.version == resource.data.version + 1 && hasAudit(request.resource.data);
+   allow update: if resource.data.kind == 'student' && request.resource.data.data.get('deleted',false) == true && resource.data.data.get('deleted',false) == false && approvedStudentDeletion(request.resource.data) && valid(request.resource.data) && request.resource.data.kind == resource.data.kind && request.resource.data.id == resource.data.id && request.resource.data.version == resource.data.version + 1 && hasAudit(request.resource.data);
+   allow update: if !(resource.data.kind == 'student' && request.resource.data.data.get('deleted',false) == true && resource.data.data.get('deleted',false) == false) && key == request.resource.data.kind + '--' + request.resource.data.id && valid(request.resource.data) && writeRecord(resource.data) && writeRecord(request.resource.data) && trashAllowed(request.resource.data) && !(resource.data.kind == 'account' && resource.data.data.get('isSuperAdmin',false) == true) && reserved(request.resource.data) && request.resource.data.id == resource.data.id && request.resource.data.kind == resource.data.kind && request.resource.data.version == resource.data.version + 1 && hasAudit(request.resource.data);
    allow create,update: if restoring() && valid(request.resource.data) && key == request.resource.data.kind + '--' + request.resource.data.id;
    allow delete: if restoring() || purgingTrash(resource.data,key);
   }
