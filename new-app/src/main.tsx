@@ -8,6 +8,7 @@ import IdleLock from './IdleLock';
 import {startIdleSession} from './idle-session';
 import ClubApp from './ClubApp';
 import './style.css';
+import './theme.css';
 function App(){const [user,setUser]=useState<any>(undefined),[member,setMember]=useState(false),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),[info,setInfo]=useState(''),[register,setRegister]=useState(false),[confirm,setConfirm]=useState(''),[verification,setVerification]=useState(false);
  async function check(u:any){setMember(false);setVerification(false);if(!u)return;try{const a=await getActor();if(!u.emailVerified){setVerification(true);return}setMember(true)}catch(e:any){setError(e.message)}}
  useEffect(()=>onAuthStateChanged(auth,u=>{setUser(u);setError('');void check(u)}),[]);
