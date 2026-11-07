@@ -79,15 +79,17 @@ service cloud.firestore {
    allow get: if active() && (!exists(/databases/$(database)/documents/clubs/antruong-v2/deletionRequests/$(id)) || (inClass(me(),resource.data.classId) && (has(me(),'students_direct') || has(me(),'approvals_manage'))));
    allow list: if active() && inClass(me(),resource.data.classId) && (has(me(),'students_direct') || has(me(),'approvals_manage'));
    allow create: if active() && !maintenance() && has(me(),'students_direct') && inClass(me(),request.resource.data.classId) &&
-    request.resource.data.keys().hasOnly(['studentUid','studentName','classId','targetVersion','requestedBy','requesterName','status','createdAt']) &&
+    request.resource.data.keys().hasOnly(['studentUid','studentName','classId','targetVersion','requestedBy','requesterName','status','createdAt','reason']) &&
     request.resource.data.studentUid is string && request.resource.data.targetVersion is int &&
     id == request.resource.data.studentUid + '_' + string(request.resource.data.targetVersion) &&
+    request.resource.data.get('reason','') is string && request.resource.data.get('reason','').size() >= 5 && request.resource.data.get('reason','').size() <= 500 &&
     request.resource.data.status == 'pending' && request.resource.data.requestedBy == request.auth.uid &&
     request.resource.data.requesterName == me().name && request.resource.data.createdAt == request.time &&
     target().kind == 'student' && target().data.get('deleted',false) == false &&
     target().data.classId == request.resource.data.classId && target().data.name == request.resource.data.studentName && target().version == request.resource.data.targetVersion;
    allow update: if reviewScope(resource.data.classId) && resource.data.status == 'pending' &&
-    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','reviewedBy','reviewerName','reviewedAt']) &&
+    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','reviewedBy','reviewerName','reviewedAt','reviewNote']) &&
+    request.resource.data.get('reviewNote','') is string && request.resource.data.get('reviewNote','').size() <= 500 &&
     request.resource.data.status in ['approved','rejected'] && request.resource.data.reviewedBy == request.auth.uid &&
     request.resource.data.reviewerName == me().name && request.resource.data.reviewedAt == request.time &&
     (request.resource.data.status == 'rejected' || (

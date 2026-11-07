@@ -5,3 +5,8 @@ async function request(studentId:string,fileId?:string,body?:any,signal?:AbortSi
 export async function uploadStudentFile(studentId:string,category:string,file:Blob){if(!file.size||file.size>5*1024*1024)throw new Error('Mỗi tệp tối đa 5 MB.');const base64=await new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onerror=()=>reject(new Error('Không đọc được tệp.'));reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.readAsDataURL(file)});return (await request(studentId,undefined,{category,base64})).record}
 export function fetchStudentFile(studentId:string,fileId:string,signal?:AbortSignal):Promise<Blob>{return request(studentId,fileId,undefined,signal) as Promise<Blob>}
 export async function downloadStudentFile(studentId:string,file:any){const blob=await fetchStudentFile(studentId,file.id),url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;const extension=file.mime==='application/pdf'?'pdf':file.mime==='image/png'?'png':file.mime==='image/webp'?'webp':'jpg';a.download=(fileLabels[file.category]||'Ho_so')+'_'+studentId+'.'+extension;a.click();setTimeout(()=>URL.revokeObjectURL(url),10000)}
+
+export async function restoreMissingStudentFile(studentId:string,fileId:string,bytes:Uint8Array){
+ const base64=await new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onerror=()=>reject(new Error('Không đọc được tệp khôi phục.'));reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.readAsDataURL(new Blob([new Uint8Array(bytes)]))});
+ return request(studentId,undefined,{action:'restore-missing',fileId,base64});
+}

@@ -22,7 +22,21 @@ export function createStudentFilesHandler({db,bucket,auth,stamp,logError}){
     const category=metadata.metadata?.category;if(!FILE_CATEGORIES.includes(category)||metadata.metadata?.studentId!==id)throw mediaError(404,'Tệp không hợp lệ.');
     authorizeStudentFile({...initial,token,category});
     const mime=metadata.contentType;if(!['image/jpeg','image/png','image/webp','application/pdf'].includes(mime))throw mediaError(404,'Định dạng tệp không hợp lệ.');
-    const [bytes]=await file.download();res.set('Content-Type',mime);res.set('Content-Disposition','attachment; filename="'+studentFileName({id:fileId,category,mime})+'"');res.status(200).send(bytes);return;
+    const [bytes]=await file.download();
+    await db.runTransaction(async tx=>{const current=await context(tx,email,id);authorizeStudentFile({...current,token,category});if(category!=='avatar'){const audit=db.collection(root+'/audit').doc();tx.set(audit,{actor:current.member.name||email,actorUid:token.uid,action:'download-file',kind:'student',record_id:id,at:stamp()})}});
+    res.set('Content-Type',mime);res.set('Content-Disposition','attachment; filename="'+studentFileName({id:fileId,category,mime})+'"');res.status(200).send(bytes);return;
+   }
+   if(req.body?.action==='restore-missing'){
+    if(initial.member?.isSuperAdmin!==true)throw mediaError(403,'Chỉ chủ CLB được phục hồi tệp.');
+    const fileId=String(req.body?.fileId||'');if(!/^[a-f0-9-]{36}$/.test(fileId))throw mediaError(400,'Mã tệp không hợp lệ.');
+    const linked=[initial.record?.data?.avatarFile,...(initial.record?.data?.studentFiles||[])].find(f=>f?.id===fileId);
+    if(!linked)throw mediaError(409,'Hãy khôi phục data.json trước để có đúng liên kết tệp.');
+    const category=linked.category;authorizeStudentFile({...initial,token,category});const {bytes,mime}=decodeStudentFile(category,req.body?.base64);
+    if(bytes.length!==linked.bytes||mime!==linked.mime)throw mediaError(409,'Tệp không khớp hồ sơ hiện tại.');
+    const destination=bucket.file('student-files/antruong-v2/'+id+'/'+fileId);
+    try{await destination.getMetadata();res.status(200).json({alreadyPresent:true});return}catch(e){if(Number(e.code)!==404)throw e}
+    try{await destination.save(bytes,{resumable:false,preconditionOpts:{ifGenerationMatch:0},metadata:{contentType:mime,cacheControl:'private,no-store',metadata:{category,studentId:id}}});uploaded=destination}catch(e){if(Number(e.code)===412){res.status(200).json({alreadyPresent:true});return}throw e}
+    await db.runTransaction(async tx=>{const current=await context(tx,email,id);if(current.member?.isSuperAdmin!==true)throw mediaError(403,'Quyền chủ CLB đã thay đổi.');authorizeStudentFile({...current,token,category});const link=[current.record?.data?.avatarFile,...(current.record?.data?.studentFiles||[])].find(f=>f?.id===fileId);if(!link||link.bytes!==bytes.length||link.mime!==mime||link.category!==category)throw mediaError(409,'Liên kết hồ sơ đã thay đổi.');const audit=db.collection(root+'/audit').doc();tx.set(audit,{actor:current.member.name||email,actorUid:token.uid,action:'restore-file',kind:'student',record_id:id,at:stamp()})});uploaded=null;res.status(200).json({restored:true});return;
    }
    const category=req.body?.category;authorizeStudentFile({...initial,token,category,write:true});
    const {bytes,mime}=decodeStudentFile(category,req.body?.base64),fileId=randomUUID(),file={id:fileId,category,mime,bytes:bytes.length,uploadedAt:new Date().toISOString()};

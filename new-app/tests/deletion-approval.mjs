@@ -7,14 +7,16 @@ const base='clubs/antruong-v2';
 const db=id=>env.authenticatedContext(id,{email:id+'@test.local',email_verified:true}).firestore();
 const staff=db('staff'),reviewer=db('reviewer'),outside=db('outside'),owner=db('owner');
 const student={kind:'student',id:'S1',data:{name:'Võ sinh',id:'VVN.0001',classId:'C1'},version:1,updatedAt:serverTimestamp()};
-const req={studentUid:'S1',studentName:'Võ sinh',classId:'C1',targetVersion:1,requestedBy:'staff',requesterName:'staff',status:'pending',createdAt:serverTimestamp()};
+const req={studentUid:'S1',studentName:'Võ sinh',classId:'C1',targetVersion:1,requestedBy:'staff',requesterName:'staff',status:'pending',reason:'Trùng hồ sơ đã xác minh',createdAt:serverTimestamp()};
 const ref=(d,p)=>doc(d,base+'/'+p);
-function decision(d,id,approve=true,extra={}){const batch=writeBatch(d);batch.update(ref(d,'deletionRequests/S1_1'),{status:approve?'approved':'rejected',reviewedBy:id,reviewerName:id,reviewedAt:serverTimestamp()});if(approve){batch.set(ref(d,'records/student--S1'),{...student,data:{...student.data,deleted:true,deletedAt:new Date().toISOString(),deletedBy:id,deletionRequestId:'S1_1',...extra},version:2,updatedAt:serverTimestamp(),auditId:'test-'+id});batch.set(ref(d,'audit/test-'+id),{actor:id,actorUid:id,action:'approve-delete',kind:'student',record_id:'S1',at:serverTimestamp()})}return batch.commit()}
+function decision(d,id,approve=true,extra={}){const batch=writeBatch(d);batch.update(ref(d,'deletionRequests/S1_1'),{status:approve?'approved':'rejected',reviewedBy:id,reviewerName:id,reviewNote:'Đã đối chiếu',reviewedAt:serverTimestamp()});if(approve){batch.set(ref(d,'records/student--S1'),{...student,data:{...student.data,deleted:true,deletedAt:new Date().toISOString(),deletedBy:id,deletionRequestId:'S1_1',...extra},version:2,updatedAt:serverTimestamp(),auditId:'test-'+id});batch.set(ref(d,'audit/test-'+id),{actor:id,actorUid:id,action:'approve-delete',kind:'student',record_id:'S1',at:serverTimestamp()})}return batch.commit()}
 try{
  await env.clearFirestore();await env.withSecurityRulesDisabled(async ctx=>{const d=ctx.firestore();await setDoc(ref(d,'meta/import'),{status:'ready'});for(const [id,classes,perms] of [['staff',['C1'],{students_direct:true}],['reviewer',['C1'],{approvals_manage:true}],['outside',['C2'],{approvals_manage:true}],['owner',[],{}]])await setDoc(ref(d,'members/'+id+'@test.local'),{id,name:id,status:'active',isSuperAdmin:id==='owner',allClasses:id==='owner',classIds:classes,permissions:perms});await setDoc(ref(d,'records/student--S1'),student);await setDoc(ref(d,'studentCodes/code-vvn.0001'),{studentUid:'S1'})});
  await assertSucceeds(getDoc(ref(staff,'deletionRequests/S1_1')));
  await assertFails(setDoc(ref(staff,'deletionRequests/S1_1'),{...req,targetVersion:2}));
  await assertFails(setDoc(ref(outside,'deletionRequests/S1_1'),{...req,requestedBy:'outside',requesterName:'outside'}));
+ await assertFails(setDoc(ref(staff,'deletionRequests/S1_1'),{...req,reason:''}));
+ await assertFails(setDoc(ref(staff,'deletionRequests/S1_1'),{...req,reason:'x'.repeat(501)}));
  await assertSucceeds(setDoc(ref(staff,'deletionRequests/S1_1'),req));
  await assertSucceeds(getDocs(query(collection(reviewer,base+'/deletionRequests'),where('classId','in',['C1']))));
  await assertFails(getDocs(collection(reviewer,base+'/deletionRequests')));

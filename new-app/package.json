@@ -16,10 +16,12 @@
     "test:student-policy": "esbuild tests/student-policy.mjs --bundle --format=esm --platform=node --outfile=tests/.student-policy-built.mjs && node tests/.student-policy-built.mjs && node tests/student-gateway.mjs",
     "test:student-files": "node tests/student-duplicates.mjs && node --test functions/student-files.test.js",
     "build:pages": "npm run build && node scripts/publish-pages.mjs",
-    "test:student-files:ui": "node tests/student-files-ui.mjs"
+    "test:student-files:ui": "node tests/student-files-ui.mjs",
+    "test:operations": "esbuild tests/operations.mjs --bundle --format=esm --platform=node --packages=external --outfile=tests/.operations-built.mjs && node tests/.operations-built.mjs"
   },
   "dependencies": {
     "firebase": "^12.0.0",
+    "jszip": "3.10.1",
     "lucide-react": "^1.31.0",
     "pdf-lib": "^1.17.1",
     "react": "19.2.6",
