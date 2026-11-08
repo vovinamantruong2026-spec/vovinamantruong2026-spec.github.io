@@ -25,6 +25,7 @@ const test=`
 import assert from 'node:assert/strict';
 import {mutate,readState,resetCurrentStudentBelts,importBackup,updateStudentRecords} from './src/gateway';
 import {ensureStudentCodes} from './src/student-codes';
+import {attendanceSaveInput,restoredAttendanceDraft,matchesAttendance} from './src/attendance';
 import {restoreApp} from './src/recovery';
 import {store,root,transactions,failBeltCursor} from 'test:database';
 const seed=(path,data)=>store.set(root+'/'+path,structuredClone(data));
@@ -48,6 +49,25 @@ await readState();const savedMedia=await mutate({kind:'student',id:'A',version:m
 assert.deepEqual(savedMedia.record.data.avatarFile,mediaStudent.data.avatarFile);assert.deepEqual(savedMedia.record.data.studentFiles,mediaStudent.data.studentFiles);
 await assert.rejects(()=>mutate({kind:'student',id:'A',version:mediaStudent.version,data:{id:'VVN.0001',name:'Stale form',classId:'C1'}}),/máy khác/);
 console.log('PASS: normal edits preserve server-managed avatar/document links and reject stale versions.');
+
+// Real mutation path: reopening a saved draft promotes the same document/version,
+// preserves marks, makeup and notes, and rejects a second device's stale revision.
+const coach=store.get(root+'/members/staff@example.test');coach.permissions.attendance_manage=true;seed('members/staff@example.test',coach);
+const attendanceState=await readState();const attendanceRows=attendanceState.records.filter(r=>r.kind==='student'&&!r.data.deleted&&r.data.enrollmentStatus!=='withdrawn'&&r.data.classId==='C1').map((r,i)=>({studentUid:r.id,status:i===1?'excused':'present',makeup:i===0,note:i===0?'Ghi chú học bù giữ nguyên':''}));
+const editor={date:'2026-11-08',classId:'C1',status:'draft',version:0,rows:attendanceRows};
+const draftAck=await mutate(attendanceSaveInput(editor,editor.date,editor.classId,false));
+const reopened={...draftAck.record.data,version:draftAck.record.version};
+assert.equal(draftAck.record.data.status,'draft');assert.equal(draftAck.record.version,1);
+const official=await mutate(attendanceSaveInput(reopened,editor.date,editor.classId,true));
+assert.equal(official.record.id,draftAck.record.id);assert.equal(official.record.version,2);assert.equal(official.record.data.status,'final');assert.deepEqual(official.record.data.rows,attendanceRows);
+await assert.rejects(()=>mutate(attendanceSaveInput(reopened,editor.date,editor.classId,true)),/máy khác/);
+const officialEdit={...official.record.data,version:official.record.version};assert.equal(attendanceSaveInput(officialEdit,editor.date,editor.classId,false).data.status,'final');
+assert.throws(()=>attendanceSaveInput({...editor,rows:[{studentUid:'A',status:'unmarked'}]},editor.date,editor.classId,true),/chưa điểm danh/);
+assert.throws(()=>attendanceSaveInput(editor,'2026-11-09',editor.classId,true),/Đang tải/);assert.equal(matchesAttendance(editor,editor.date,'C2'),false);
+assert.equal(restoredAttendanceDraft(reopened,{...reopened,version:0}),null);assert.equal(restoredAttendanceDraft(reopened,{...reopened,date:'2026-11-09'}),null);assert.equal(restoredAttendanceDraft(reopened,{...reopened,status:'final'}).status,'draft');
+assert.deepEqual(restoredAttendanceDraft(officialEdit,{...officialEdit,status:'draft'}).rows,attendanceRows);assert.equal(restoredAttendanceDraft(officialEdit,{...officialEdit,status:'draft'}).status,'final');
+console.log('PASS: saved draft reopens and becomes official in the same document; notes/makeup preserved; stale revision, unmarked rows, wrong session and local status spoofing blocked.');
+
 const owner=store.get(root+'/members/staff@example.test');owner.isSuperAdmin=true;seed('members/staff@example.test',owner);seed('meta/studentCodes',{ready:false});
 await ensureStudentCodes({},root);assert.equal(store.get(root+'/studentCodes/code-vvn.0002').studentUid,'purged');assert.ok(store.has(root+'/studentCodes/code-vvn.0005'));
 await restoreApp({hash:'test-restore',name:'test.json',plan:{rows:[{kind:'class',id:'C1',data:{name:'C1'}},student('A','VVN.0001')],members:null,profiles:null}},()=>{});

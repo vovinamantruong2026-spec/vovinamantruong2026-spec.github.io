@@ -223,3 +223,120 @@
 }
 @media screen and (max-width:380px){.topbar-actions{gap:4px}.sync-status{font-size:9px;padding:5px 6px}.breadcrumb strong{font-size:11px}.topbar{padding:0 11px}main{padding:21px 13px 0}.stat-card{padding:13px 11px}.stat-icon{width:25px;height:25px}.stat-top{font-size:10px}.stat-value{font-size:23px}.welcome{padding:21px}.welcome h2{font-size:26px}.recent-list .recent-icon{width:32px;height:32px;flex-shrink:0}.recent-list small{font-size:10px}.permission-grid{grid-template-columns:1fr}.modal-actions .primary,.modal-actions .secondary{flex:1}}
 @media (prefers-reduced-motion:reduce){button,a,input,select,textarea{transition:none!important}.stat-shortcut:enabled:hover,.primary:hover,.welcome-buttons button:hover{transform:none}}
+
+/* Task-focused navigation and compact overview. */
+@media screen {
+ .mobile-bottom-nav,.student-mobile-list,.attendance-mobile-list{display:none}
+ .compact-overview .welcome{min-height:164px;padding:22px 28px;align-items:center}
+ .compact-overview .welcome h2{font-size:25px;margin:8px 0 6px}
+ .compact-overview .welcome p{font-size:12px}
+ .compact-overview .welcome-buttons{margin-top:12px}
+ .compact-overview .welcome-art{height:175px;width:210px;right:20px;top:0}
+ .compact-overview .welcome-art img{width:94px;height:94px}
+ .compact-overview .art-circle{width:160px;height:160px;top:7px}
+ .compact-overview .circle-2{width:205px;height:205px;top:-15px}
+ .compact-overview .art-caption{font-size:8px;margin-top:9px}
+ .saved-attendance-controls{padding:0 23px 21px;display:grid;grid-template-columns:minmax(165px,1fr) minmax(0,2fr);gap:15px;align-items:end}
+ .saved-attendance-controls select{width:100%;min-width:0}
+ .saved-attendance .panel-heading{padding-bottom:14px}
+ .saved-attendance .field{margin-bottom:0;min-width:0}
+ .attendance-toolbar .attendance-session-state{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+ .attendance-session-state small{font-size:11px;line-height:1.5;color:#6b809c}
+ .attendance-editor-fields{border:0;margin:0;padding:0;min-width:0}
+ .attendance-editor-fields:disabled{opacity:.7}
+ .attendance-save-bar{position:sticky;bottom:14px;z-index:23;background:#fff;border:1px solid #dce6f3;border-radius:14px;padding:15px 20px;box-shadow:0 5px 25px #14386616;margin:16px 0 23px;gap:12px;justify-content:space-between}
+ .attendance-save-bar>div{display:flex;gap:10px}
+ .attendance-save-bar .primary,.attendance-save-bar .secondary{min-height:44px}
+ .report-title .secondary{margin-top:10px}
+}
+@media screen and (max-width:760px){
+ :root{--mobile-nav-height:64px}
+ .app-shell main{padding-bottom:calc(var(--mobile-nav-height) + env(safe-area-inset-bottom,0px) + 24px)}
+ .mobile-bottom-nav{display:grid;position:fixed;bottom:0;left:0;right:0;z-index:25;background:#fff;box-shadow:0 -4px 24px #183c6610;border-top:1px solid #e0e8f3;padding:4px 5px calc(4px + env(safe-area-inset-bottom,0px));min-height:calc(var(--mobile-nav-height) + env(safe-area-inset-bottom,0px))}
+ .mobile-bottom-nav button{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;border:0;border-radius:10px;min-height:55px;min-width:0;padding:6px 2px;background:transparent;color:#6a7e99;font-size:10px;line-height:1.25;white-space:nowrap;font-weight:500}
+ .mobile-bottom-nav button svg{width:21px;height:21px;flex-shrink:0}
+ .mobile-bottom-nav button.active{background:#edf4ff;color:#1754ad;font-weight:650}
+ .mobile-bottom-nav button:focus-visible{outline-offset:-3px}
+ .sidebar{padding-bottom:env(safe-area-inset-bottom,0px)}
+ .compact-overview .welcome{min-height:0;padding:17px 20px;border-radius:14px;margin-bottom:17px}
+ .compact-overview .welcome h2{font-size:22px;line-height:1.35;margin:7px 0 5px}
+ .compact-overview .welcome p{font-size:11px;max-width:none}
+ .compact-overview .welcome-tag{font-size:8px;padding:4px 7px}
+ .compact-overview .welcome-buttons{margin-top:12px}
+ .compact-overview .welcome-buttons button{min-height:42px;font-size:12px;padding:9px 12px}
+ .compact-overview .welcome-art{display:none}
+ .compact-overview .page-heading{margin-bottom:18px}
+ .compact-overview .page-heading p{font-size:12px}
+ .student-desktop-table,.attendance-desktop-table{display:none}
+ .student-mobile-list,.attendance-mobile-list{display:grid;gap:12px;padding:0 16px 17px}
+ .student-mobile-card,.attendance-mobile-card{background:#fbfdff;border:1px solid #e1e9f4;border-radius:13px;padding:15px;min-width:0}
+ .student-mobile-card.selected{background:#f0f6ff;border-color:#87acdf;box-shadow:0 0 0 1px #c1d4ee}
+ .student-mobile-head{display:flex;align-items:center;gap:10px;min-width:0}
+ .student-mobile-head>input[type=checkbox]{height:19px;width:19px;min-height:19px;flex:0 0 19px;accent-color:#1854b1}
+ .student-mobile-name{flex:1;min-width:0}
+ .student-mobile-name strong{font-size:14px;color:#284462;display:block;overflow-wrap:anywhere;line-height:1.45}
+ .student-mobile-name small{display:block;margin-top:3px;font-size:11px;color:#73869f;overflow-wrap:anywhere}
+ .student-mobile-card>.badge{margin-top:10px;white-space:normal}
+ .student-mobile-facts{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:11px;margin:14px 0 10px}
+ .student-mobile-facts dt{font-size:11px;color:#778aa3;margin-bottom:2px}
+ .student-mobile-facts dd{margin:0;font-size:12px;color:#3b5878;overflow-wrap:anywhere;line-height:1.5}
+ .student-mobile-bottom{display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid #e6edf7;padding-top:5px}
+ .student-mobile-bottom .row-action{min-height:40px}
+ .student-mobile-list .mobile-list-empty,.attendance-mobile-list .mobile-list-empty{font-size:12px;color:#75869d;text-align:center;padding:20px 8px}
+ .saved-attendance-controls{padding:0 17px 18px;grid-template-columns:1fr;gap:12px}
+ .saved-attendance-controls select{font-size:14px;min-height:44px}
+ .saved-attendance .panel-heading{padding-bottom:14px}
+ .saved-attendance .panel-heading p{font-size:11px}
+ .attendance-toolbar .form-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:13px}
+ .attendance-toolbar .field,.attendance-toolbar .field:nth-child(2){width:auto;min-width:0}
+ .attendance-toolbar input,.attendance-toolbar select{width:100%;min-width:0;font-size:14px;padding:10px}
+ .attendance-toolbar .attendance-session-state{display:flex;grid-column:1/-1;padding-top:3px}
+ .attendance-session-state .badge{font-size:11px}
+ .attendance-stats{grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:18px}
+ .attendance-mobile-list{padding:0 16px 17px}
+ .attendance-order{display:grid;place-items:center;color:#4c78ae;background:#edf4ff;min-width:25px;height:25px;border-radius:8px;font-size:11px}
+ .attendance-mobile-head>.badge{font-size:10px;padding:4px 7px}
+ .attendance-mobile-card .student-mobile-head>.badge{font-size:10px;padding:4px 7px;flex-shrink:0}
+ .attendance-mobile-card .status-buttons{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:15px}
+ .attendance-mobile-card .status-buttons button{padding:9px 5px;min-height:44px;font-size:12px}
+ .attendance-note{display:block;margin-top:12px}
+ .attendance-note>span{font-size:11px;color:#7488a2;display:block;margin-bottom:5px}
+ .attendance-note input{font-size:16px;width:100%;min-width:0;min-height:42px;background:#fff}
+ .attendance-mobile-card .personal-hint{margin:9px 0 0}
+ .attendance-mobile-card .personal-hint .text-btn{min-height:30px;font-size:11px;margin-left:6px}
+ .attendance-save-bar{position:sticky;bottom:calc(var(--mobile-nav-height) + env(safe-area-inset-bottom,0px) + 9px);z-index:23;padding:12px;margin:15px 0 20px;border-radius:13px}
+ .attendance-save-bar>p{display:none}
+ .attendance-save-bar>div{width:100%;display:flex;gap:9px}
+ .attendance-save-bar button{flex:1;min-width:0;padding:11px 7px;font-size:12px;min-height:45px;white-space:normal}
+ .attendance-save-bar button svg{width:17px;height:17px;flex-shrink:0}
+ .toast{bottom:calc(var(--mobile-nav-height) + env(safe-area-inset-bottom,0px) + 18px)}
+ .attendance-page .toast{bottom:calc(var(--mobile-nav-height) + env(safe-area-inset-bottom,0px) + 92px)}
+}
+@media screen and (max-width:360px){.mobile-bottom-nav button{font-size:9px}.student-mobile-list,.attendance-mobile-list{padding:0 12px 14px}.student-mobile-card,.attendance-mobile-card{padding:12px}.student-mobile-head{gap:8px}.student-mobile-name strong{font-size:13px}.compact-overview .welcome h2{font-size:21px}.attendance-toolbar .form-row{grid-template-columns:1fr}.attendance-mobile-card .status-buttons{gap:5px}}
+@media print{.mobile-bottom-nav,.student-mobile-list,.attendance-mobile-list,.saved-attendance,.attendance-save-bar{display:none!important}}
+@media screen{
+ .student-filters{display:contents}
+ .student-request-history{margin:0 0 18px;font-size:12px;color:#456c9e}
+ .student-request-history>summary{display:flex;align-items:center;gap:9px;min-height:40px;cursor:pointer;list-style:none;width:max-content;max-width:100%;padding:4px 0}
+ .student-request-history>summary::-webkit-details-marker{display:none}
+ .student-request-history[open]>summary svg{transform:rotate(180deg)}
+ .student-request-history>.panel{margin-top:10px}
+ .history-retention-note{font-size:11px;color:#6a7e99;margin:0 0 15px;line-height:1.6}
+ .history-retention-note summary{cursor:pointer;min-height:28px}
+ .history-retention-note p{padding:7px 0 0;max-width:700px}
+}
+@media screen and (max-width:760px){
+ .compact-overview .welcome p{display:none}
+ .students-page .section-toolbar>p{display:none}
+ .students-page .section-toolbar{margin-bottom:6px}
+ .student-request-history{margin-bottom:12px}
+ .student-filters{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;padding:0 17px 12px;align-items:center}
+ .student-filters>.filters{display:contents}
+ .student-filters .search-field{grid-column:1/-1;width:100%}
+ .student-filters select{width:100%;max-width:100%;min-width:0;padding:9px 8px;font-size:14px}
+ .student-filters .duplicate-filter{grid-column:1/-1;font-size:11px;min-height:32px}
+ .student-bulk-tools{display:flex;flex-direction:row;align-items:center;flex-wrap:wrap;gap:8px 14px;padding-bottom:12px}
+ .student-bulk-tools .duplicate-filter{font-size:11px;min-height:32px}
+ .student-bulk-tools>span{font-size:11px;color:#71849f}
+ .student-bulk-tools>button{flex:1 0 100%;min-height:40px}
+}

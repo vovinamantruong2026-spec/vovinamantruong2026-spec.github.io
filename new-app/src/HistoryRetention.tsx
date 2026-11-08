@@ -8,5 +8,6 @@ export default function HistoryRetention({actor,records,tab}:any){
   void sweep();const timer=setInterval(sweep,60*60*1000);window.addEventListener('focus',sweep);return()=>{live=false;clearInterval(timer);window.removeEventListener('focus',sweep)};
  },[actor?.identityId,actor?.isSuperAdmin]);
  if(!['attendance','tuition','reports','trash'].includes(tab)&&!notice&&!error)return null;
+ if(!notice&&!error)return <details className="history-retention-note"><summary>Lịch sử giữ trong 3 tháng</summary><p>Giữ tháng hiện tại và 2 tháng trước, từ {historyCutoff().split('-').reverse().join('/')}. Lịch sử cũ vào thùng rác 15 ngày; hồ sơ võ sinh và lớp được giữ nguyên.</p></details>;
  return <div className={'alert '+(error?'warning':'info')} role={error?'alert':'status'}><div>{error||notice||'Chỉ giữ điểm danh và học phí của tháng hiện tại cùng 2 tháng trước (từ '+historyCutoff().split('-').reverse().join('/')+'). Lịch sử cũ chuyển vào thùng rác 15 ngày; hồ sơ võ sinh và lớp vẫn giữ nguyên.'}</div></div>
 }
