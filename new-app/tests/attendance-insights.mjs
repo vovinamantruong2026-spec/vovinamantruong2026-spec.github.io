@@ -1,0 +1,27 @@
+import assert from 'node:assert/strict';
+import {attendanceInsights as stats} from '../src/attendance-insights.ts';
+import {attendanceSaveInput,reconcileAttendance} from '../src/attendance.ts';
+const student={id:'s',data:{name:'Test',classId:'c',joinDate:'2025-12-01'}};
+const session=(date,status,extra={})=>({id:date+'_c',version:1,data:{date,classId:'c',status:'final',rows:[{studentUid:'s',status,makeup:false}],...extra}});
+const dates=['2025-12-28','2025-12-30','2026-01-02','2026-01-04'];
+const four=dates.map(d=>session(d,'absent'));
+assert.equal(stats(student,four,'2026','2026-01-20').streak,4,'streak crosses year');
+assert.equal(stats(student,four.slice(0,3),'','2026-01-20').streak,3);
+assert.equal(stats(student,four,'2026-01','2026-01-20').absent,2);
+for(const status of ['present','excused'])assert.equal(stats(student,[...four,session('2026-01-06',status)],'','2026-01-20').streak,0);
+assert.equal(stats(student,[four[0],session('2025-12-29','present'),...four.slice(1)],'','2026-01-20').streak,3,'not cumulative');
+const ignored=[session('2026-01-07','present',{status:'draft'}),session('2026-01-08','unmarked'),session('2026-01-09','present',{deleted:true}),session('2026-01-21','present'),session('2025-11-30','present'),session('2026-01-10','absent',{rows:[{studentUid:'s',status:'absent',makeup:true}]}),session('2026-01-11','absent',{rows:[{studentUid:'other',status:'absent'}]})];
+assert.equal(stats(student,[...four,...ignored],'','2026-01-20').streak,4,'ignored sessions do not reset');
+assert.equal(stats(student,[...four,...ignored],'','2026-01-20').total,4);
+const input=[session('2026-01-01','present'),session('2026-01-02','absent'),session('2026-01-03','excused')].reverse(),before=JSON.stringify(input);
+assert.equal(stats(student,input,'2026','2026-01-20').rate,33.3);
+assert.equal(JSON.stringify(input),before,'calculation does not mutate attendance');
+assert.equal(stats(student,[],'2026','2026-01-20').rate,null);
+// Existing draft/final flow still rejects incomplete finalization and preserves final status.
+const att={date:'2026-01-01',classId:'c',version:1,status:'draft',rows:[{studentUid:'s',status:'unmarked',note:'',makeup:false}]};
+assert.equal(attendanceSaveInput(att,att.date,'c',false).data.status,'draft');
+assert.throws(()=>attendanceSaveInput(att,att.date,'c',true));
+const final={...att,status:'final',rows:[{...att.rows[0],status:'present'}]};
+assert.equal(attendanceSaveInput(final,att.date,'c',false).data.status,'final');
+assert.equal(reconcileAttendance(final,[]),final);
+console.log('Attendance insights: thresholds, cross-year streak, resets, exclusions, rates, immutability and existing save flows passed.');

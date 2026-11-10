@@ -30,3 +30,19 @@
 .stat-shortcut{text-align:left;font:inherit;color:inherit;width:100%}.stat-shortcut:enabled{cursor:pointer}.stat-shortcut:enabled:hover,.stat-shortcut:focus-visible{outline:2px solid #134c9c;outline-offset:2px}.stat-shortcut:disabled{opacity:1;cursor:default}
 
 .ops-actions{display:flex;flex-wrap:wrap;gap:12px;margin:16px 0}.ops-actions label.secondary{position:relative;overflow:hidden;cursor:pointer}.ops-form,.ops-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:20px 0}.ops-metrics>div{background:#f1f6fd;padding:18px;border-radius:12px}.ops-metrics small,.ops-metrics strong{display:block}.ops-metrics strong{font-size:22px}.padded>p{margin-bottom:14px}.table-wrap textarea{width:240px;max-width:100%;min-height:70px;resize:vertical}.modal textarea{min-height:100px}@media(max-width:640px){.ops-form,.ops-metrics{grid-template-columns:1fr}.section-toolbar{flex-wrap:wrap}.ops-actions>.primary,.ops-actions>.secondary{width:100%;justify-content:center}}
+
+/* Attendance insights are scoped to avoid changing existing forms/tables. */
+.attendance-insights,.attendance-alerts{margin-bottom:20px}
+.insights-controls{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px}
+.insights-controls input,.insights-controls select{width:100%;min-width:0}
+.insights-note,.attendance-alerts>p{font-size:13px;color:#596b82;line-height:1.6;margin:10px 0}
+.attendance-alerts summary{cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.insights-alert-list{display:grid;gap:10px;margin-top:14px}
+.insights-alert-list>div{display:flex;flex-direction:column;align-items:flex-start;gap:6px;border:1px solid #f5d4cb;background:#fff9f6;border-radius:12px;padding:14px}
+.insights-alert-list small{overflow-wrap:anywhere;color:#596b82}
+.student-attendance-insight{background:#f0f7ff;border-radius:12px;padding:14px;margin-bottom:16px;line-height:1.6}
+.student-attendance-insight p{margin:6px 0}
+@media(max-width:700px){.insights-controls{grid-template-columns:repeat(2,minmax(0,1fr))}.attendance-alerts summary .badge{white-space:normal}.attendance-insights .table-wrap{max-width:100%;overflow-x:auto}}
+.attendance-alerts{padding:18px 22px}
+.attendance-insights .insights-controls{padding:0 22px}
+.attendance-insights .insights-note{margin:10px 22px}
