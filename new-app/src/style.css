@@ -46,3 +46,17 @@
 .attendance-alerts{padding:18px 22px}
 .attendance-insights .insights-controls{padding:0 22px}
 .attendance-insights .insights-note{margin:10px 22px}
+
+.gear-orders,.gear-fields,.gear-registrations{display:grid;gap:12px}
+.gear-order{min-width:0;padding:12px;border:1px solid #dce5ef;border-radius:12px}
+.gear-order-heading,.gear-status{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.gear-order-heading{justify-content:space-between}
+.gear-order-heading h3,.gear-fields h3{margin:0}
+.gear-note{white-space:pre-wrap;overflow-wrap:anywhere;margin:6px 0}
+.gear-registrations{list-style:none;padding:0;margin:10px 0 0}
+.gear-registrations li{padding-top:8px;border-top:1px solid #dce5ef}
+.gear-registrations .gear-status{margin-top:4px}
+.gear-fields{min-width:0;margin:0;padding:0;border:0}
+.gear-picker{max-height:180px;overflow:auto;border:1px solid #dce5ef;border-radius:8px;padding:8px}
+.gear-picker .checkbox{min-height:36px}
+.gear-status .badge.amber{background:#fff1ce;color:#765207}
