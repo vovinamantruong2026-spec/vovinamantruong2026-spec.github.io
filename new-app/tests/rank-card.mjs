@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {cardPages, defaultCard, drawRankCard, emptyBack, extraCardValues, normalizeCard, rankCardAllowed, sideTemplate, studentCardValues} from '../src/rank-card.ts';
+import {cardPages, defaultCard, drawRankCard, emptyBack, extraCardValues, normalizeCard, rankCardAllowed, rankCardPhotoCrop, rankCardPhotoFits, rankCardPhotoLayout, sideTemplate, studentCardValues} from '../src/rank-card.ts';
 
 assert.equal(rankCardAllowed(null),false);
 assert.equal(rankCardAllowed({permissions:{reports_export:true,settings_manage:true}}),false);
@@ -50,4 +50,17 @@ for(let i=0;i<3;i++){
 const multi=cardPages(Array.from({length:11},(_,i)=>'F'+i),layout,Array.from({length:11},(_,i)=>'B'+i));
 assert.deepEqual(multi.map(p=>p[0].src),['F0','B0','F8','B8']);
 assert.throws(()=>cardPages(['F1'],layout,[]));
+const photoGeometry=rankCardPhotoLayout(layout,856,540);
+assert.equal(photoGeometry.width,200);
+assert.equal(photoGeometry.height,300);
+assert.deepEqual(rankCardPhotoCrop(400,300),{x:100,y:0,width:200,height:300});
+const edge={...layout,slots:{...layout.slots,photo:{...layout.slots.photo,x:95,y:95}}};
+assert.deepEqual(rankCardPhotoLayout(edge,856,540),{x:656,y:240,width:200,height:300});
+assert.equal(rankCardPhotoFits({...layout,heightMm:25}),false);
+assert.equal(rankCardPhotoFits({...layout,heightMm:25,slots:{...layout.slots,photo:{...layout.slots.photo,enabled:false}}}),true);
+const profile={name:'Tên cũ',id:'VVN.0004',rankCard:{linked:true}};
+const newProfile={...profile,name:'Tên mới',belt:'Lam đai'};
+assert.equal(studentCardValues(newProfile,'Lớp mới').name,'Tên mới');
+assert.equal(studentCardValues(newProfile,'Lớp mới').belt,'Lam đai');
+assert.equal(newProfile.rankCard.linked,true);
 console.log('PASS: card permissions, physical sizing, safe template, field mapping, photo and hidden fields');

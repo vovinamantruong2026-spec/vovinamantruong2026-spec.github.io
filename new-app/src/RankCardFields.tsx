@@ -47,11 +47,17 @@ export default function RankCardFields({side,heightMm,color,onChange}:Props) {
    </select></label>
    {field.source==='text'&&<label>Nội dung in trên thẻ<input value={field.text} maxLength={240} placeholder="Ví dụ: Đơn vị cấp thẻ" onChange={e=>changeExtra({text:e.target.value})}/></label>}
   </div>}
-  <label className="rank-card-toggle"><input type="checkbox" checked={slot.enabled} onChange={e=>changeSlot({enabled:e.target.checked})}/> Hiển thị trên mặt này</label>
+  <fieldset className="rank-card-visibility">
+   <legend>Trường hiển thị trên mặt này</legend>
+   {cardKeys.map(item=><label key={item}><input type="checkbox" checked={side.slots[item].enabled}
+    onChange={e=>onChange({...side,slots:{...side.slots,[item]:{...side.slots[item],enabled:e.target.checked}}})}/>{cardFields[item]}</label>)}
+   {extras.map(item=><label key={item.id}><input type="checkbox" checked={item.slot.enabled}
+    onChange={e=>onChange({...side,extras:extras.map(extra=>extra.id===item.id?{...extra,slot:{...extra.slot,enabled:e.target.checked}}:extra)})}/>{item.label||'Trường bổ sung'}</label>)}
+  </fieldset>
   <div className="rank-card-filters">
    <label>Từ trái (%)<input type="range" min={0} max={95} step={0.5} value={slot.x} onChange={e=>changeSlot({x:Number(e.target.value)})}/><output>{slot.x}%</output></label>
    <label>Từ trên (%)<input type="range" min={0} max={95} step={0.5} value={slot.y} onChange={e=>changeSlot({y:Number(e.target.value)})}/><output>{slot.y}%</output></label>
-   {isPhoto?<label>Cạnh ảnh (% chiều rộng thẻ)<input type="range" min={2} max={85} step={0.5} value={slot.size} onChange={e=>changeSlot({size:Number(e.target.value)})}/><output>{slot.size}%</output></label>:
+   {isPhoto?<p>Ảnh hồ sơ tự đồng bộ, cắt theo khổ dọc 2 × 3 cm.</p>:
    <>
     <label>Rộng tối đa (%)<input type="range" min={3} max={100} step={0.5} value={slot.width??Math.round(98-slot.x)} onChange={e=>changeSlot({width:Number(e.target.value)})}/><output>{slot.width??Math.round(98-slot.x)}%</output></label>
     <label>Cỡ chữ (mm)<input type="range" min={0.5} max={20} step={0.1} value={slot.fontMm??Math.max(0.5,Math.round(heightMm*slot.size/10)/10)} onChange={e=>changeSlot({fontMm:Number(e.target.value)})}/><output>{slot.fontMm??Math.max(0.5,Math.round(heightMm*slot.size/10)/10)} mm</output></label>

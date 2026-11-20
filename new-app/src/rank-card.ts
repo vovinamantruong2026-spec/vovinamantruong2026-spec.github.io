@@ -130,6 +130,27 @@ export function extraCardValues(data:any): Record<Exclude<ExtraSource,'text'>,st
   status:String(data.name?(data.enrollmentStatus==='withdrawn'?'Đã nghỉ':'Đang học'):'')};
 }
 
+export const rankCardPhotoMm={width:20,height:30} as const;
+
+export function rankCardPhotoLayout(template:RankCardTemplate, width:number, height:number) {
+ const slot=template.slots.photo;
+ const size=rankCardPhotoMm;
+ if(!slot.enabled||template.widthMm<size.width||template.heightMm<size.height)return null;
+ const w=size.width*width/template.widthMm,h=size.height*height/template.heightMm;
+ return {x:Math.min(slot.x*width/100,width-w),y:Math.min(slot.y*height/100,height-h),width:w,height:h};
+}
+
+export function rankCardPhotoFits(template:RankCardTemplate) {
+ return [template,template.back].every(side=>!side?.image||!side.slots.photo.enabled||
+  (template.widthMm>=rankCardPhotoMm.width&&template.heightMm>=rankCardPhotoMm.height));
+}
+
+export function rankCardPhotoCrop(width:number,height:number) {
+ const ratio=rankCardPhotoMm.width/rankCardPhotoMm.height;
+ const w=Math.min(width,height*ratio),h=Math.min(height,width/ratio);
+ return {x:(width-w)/2,y:(height-h)/2,width:w,height:h};
+}
+
 export async function drawRankCard(template:RankCardTemplate,values:ReturnType<typeof studentCardValues>,photo?:Blob,
  extra?:ReturnType<typeof extraCardValues>) {
  const canvas=document.createElement('canvas');
@@ -141,13 +162,14 @@ export async function drawRankCard(template:RankCardTemplate,values:ReturnType<t
  ctx.fillStyle='#fff';
  ctx.fillRect(0,0,w,h);
  if(template.image)ctx.drawImage(await loadImage(template.image),0,0,w,h);
- const slot=template.slots.photo;
- if(photo&&slot.enabled) {
+ const placement=rankCardPhotoLayout(template,w,h);
+ if(photo&&template.slots.photo.enabled&&!placement)throw new Error('Khổ thẻ quá nhỏ để đặt ảnh 2 × 3 cm.');
+ if(photo&&placement) {
   const url=URL.createObjectURL(photo);
   try {
-   const image=await loadImage(url), side=Math.min(image.naturalWidth,image.naturalHeight);
-   const size=Math.min(slot.size*w/100,(100-slot.x)*w/100,(100-slot.y)*h/100);
-   ctx.drawImage(image,(image.naturalWidth-side)/2,(image.naturalHeight-side)/2,side,side,slot.x*w/100,slot.y*h/100,size,size);
+   const image=await loadImage(url);
+   const crop=rankCardPhotoCrop(image.naturalWidth,image.naturalHeight);
+   ctx.drawImage(image,crop.x,crop.y,crop.width,crop.height,placement.x,placement.y,placement.width,placement.height);
   } finally { URL.revokeObjectURL(url); }
  }
  ctx.textBaseline='top';
