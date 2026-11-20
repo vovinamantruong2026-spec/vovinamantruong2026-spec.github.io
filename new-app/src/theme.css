@@ -340,3 +340,11 @@
  .student-bulk-tools>span{font-size:11px;color:#71849f}
  .student-bulk-tools>button{flex:1 0 100%;min-height:40px}
 }
+
+.student-excel-buttons { display:flex; flex-direction:column; align-items:stretch; gap:.55rem; position:relative; }
+.student-excel-buttons > button { justify-content:center; }
+.student-excel-panel { position:absolute; z-index:5; right:0; top:100%; margin-top:.65rem; width:min(42rem, calc(100vw - 2.5rem)); }
+.student-excel-body { padding:0 1rem 1rem; }
+.student-excel-controls { display:flex; flex-wrap:wrap; align-items:center; gap:.75rem; margin-bottom:.75rem; }
+.student-excel-controls input { max-width:100%; }
+.student-excel-panel .table-wrap { max-height:18rem; overflow:auto; margin-bottom:.75rem; }
