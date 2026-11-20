@@ -36,9 +36,10 @@ export default function Exams({records,students,save,pending,sync}:{
  const rows=rosters.flatMap(r=>(draft[r.id]?.entries??savedEntries(r)).map((entry:Entry)=>({r,entry})));
  const visibleRows=rows.filter(({r})=>!filter||r.data.classId===filter);
  const className=(id:string)=>classes.find(c=>c.id===id)?.data.name??'Lớp cũ';
+ const selectedStudents=new Set(rows.map(({entry})=>entry.studentUid));
+ const savedStudents=new Set(rosters.flatMap(r=>savedEntries(r).map(entry=>entry.studentUid)));
  const candidateRoster=new Map(rosters.map(r=>[r.data.classId,r]));
  const candidates=students.filter(s=>candidateRoster.has(s.data.classId)&&(!filter||filter===s.data.classId)&&
-  !rows.some(({entry})=>entry.studentUid===s.id)&&
   (s.data.name+' '+s.data.id).toLocaleLowerCase('vi').includes(query.trim().toLocaleLowerCase('vi')));
  function update(roster:Rec,entries:Entry[]){
   setDraft(current=>({...current,[roster.id]:{entries,version:current[roster.id]?.version??roster.version}}));
@@ -136,10 +137,16 @@ export default function Exams({records,students,save,pending,sync}:{
      <label>Tìm theo tên hoặc mã<input value={query} onChange={e=>setQuery(e.target.value)}/></label>
      <div style={{maxHeight:230,overflowY:'auto'}}>{candidates.map(s=>{
       const r=candidateRoster.get(s.data.classId)!;
-      return <div key={s.id}><button type="button" className="text-btn" onClick={()=>update(r,[
-       ...(draft[r.id]?.entries??savedEntries(r)),
-       {studentUid:s.id,name:s.data.name,code:s.data.id,fee:r.data.fee,paid:false,result:'pending'},
-      ])}>Thêm {s.data.name} · {s.data.id} · {className(s.data.classId)}</button></div>;
+      return <label key={s.id} className="exam-choice">
+       <input type="checkbox" checked={selectedStudents.has(s.id)} disabled={savedStudents.has(s.id)}
+        onChange={event=>{
+         const entries=draft[r.id]?.entries??savedEntries(r);
+         update(r,event.target.checked?[
+          ...entries,{studentUid:s.id,name:s.data.name,code:s.data.id,fee:r.data.fee,paid:false,result:'pending'},
+         ]:entries.filter(entry=>entry.studentUid!==s.id));
+        }}/>
+       <span>{s.data.name} · {s.data.id} · {className(s.data.classId)}</span>
+      </label>;
      })}{!candidates.length&&<p>Không có võ sinh phù hợp.</p>}</div>
     </details>
     <h3>Danh sách võ sinh đã chọn ({visibleRows.length})</h3>
