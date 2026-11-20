@@ -212,7 +212,9 @@ export default function ClubApp(){
   const byId=new Map(entries.map(entry=>[entry.studentUid,entry]));
   return updateRankCardProfiles([...byId.keys()],student=>{
    if(student.data.examDate&&student.data.examDate>exam.date)return null;
-   const patch={examSession:exam.name,examDate:exam.date,organization:exam.organization,belt:byId.get(student.id)?.belt?.trim()||exam.belt};
+   const belt=byId.get(student.id)?.belt?.trim();
+   if(!belt)throw new Error('Nhập cấp đai đạt cho '+student.data.name+'.');
+   const patch={examSession:exam.name,examDate:exam.date,organization:exam.organization,belt};
    return Object.entries(patch).every(([key,value])=>student.data[key]===value)?null:patch;
   });
  }
