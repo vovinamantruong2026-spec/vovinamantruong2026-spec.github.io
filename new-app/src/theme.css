@@ -348,3 +348,19 @@
 .student-excel-controls { display:flex; flex-wrap:wrap; align-items:center; gap:.75rem; margin-bottom:.75rem; }
 .student-excel-controls input { max-width:100%; }
 .student-excel-panel .table-wrap { max-height:18rem; overflow:auto; margin-bottom:.75rem; }
+
+.rank-card-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.2fr); gap:1rem; }
+.rank-card-grid > .panel { min-width:0; }
+.rank-card-body { padding:0 1rem 1rem; }
+.rank-card-filters, .rank-card-actions { display:flex; flex-wrap:wrap; gap:.75rem; }
+.rank-card-filters > label { flex:1 1 8rem; }
+.rank-card-filters label, .rank-card-editor > label { display:grid; align-content:start; gap:.35rem; }
+.rank-card-filters input, .rank-card-filters select, .rank-card-editor input, .rank-card-editor select { max-width:100%; }
+.rank-card-roster { border:1px solid #e3eaf3; border-radius:.6rem; padding:.55rem; max-height:20rem; overflow:auto; margin:1rem 0; }
+.rank-card-roster label { display:flex; align-items:center; gap:.65rem; padding:.45rem; }
+.rank-card-roster small { display:block; }
+.rank-card-preview { display:block; width:min(100%,640px); border:1px solid #cbd5e1; border-radius:.35rem; }
+.rank-card-editor { display:grid; gap:.8rem; margin-top:1rem; }
+.rank-card-editor .rank-card-toggle { display:flex; align-items:center; }
+.rank-print-frame { position:fixed; width:1px; height:1px; inset:auto auto 0 0; border:0; opacity:0; pointer-events:none; }
+@media(max-width:850px) { .rank-card-grid { grid-template-columns:minmax(0,1fr); } }

@@ -1,3 +1,5 @@
+import RankCards from './RankCards';
+import {normalizeCard,rankCardAllowed,type RankCardTemplate} from './rank-card';
 import StudentExcelImport from './StudentExcelImport';
 import {GearOrderFields,GearOrders,gearRegistrations} from './GearOrders';
 import AttendanceInsights,{AbsenceAlerts,StudentAttendanceInsight} from './AttendanceInsights';
@@ -36,12 +38,12 @@ import {useEffect,useMemo,useRef,useState} from 'react';
 import {LayoutDashboard,Users,ClipboardCheck,Wallet,School,ShoppingBag,Trophy,ShieldCheck,FileBarChart,Settings,Search,Plus,ChevronRight,ArrowUpRight,Menu,X,Download,RefreshCw,Check,Save,LogOut,AlertCircle,Cloud,History,UserRound,ChevronDown,CalendarDays,CheckCircle2,Clock,MoreHorizontal} from 'lucide-react';
 
 type RecordRow={kind:string;id:string;data:any;version:number;updatedAt?:string};
-const nav=[['overview','Tổng quan',LayoutDashboard,''],['personal','Hồ sơ cá nhân',UserRound,''],['students','Võ sinh',Users,'students_direct'],['attendance','Điểm danh',ClipboardCheck,'attendance_manage'],['diligence','Chuyên cần',FileBarChart,'attendance_manage'],['tuition','Học phí',Wallet,'tuition_manage'],['classes','Lớp học',School,'classes_manage'],['gear','Võ phục & dụng cụ',ShoppingBag,'gear_manage'],['tournaments','Thi đấu',Trophy,'tournaments_manage'],['approvals','Phê duyệt',ShieldCheck,'approvals_manage'],['reports','Báo cáo',FileBarChart,'reports_export'],['accounts','Tài khoản',UserRound,'owner'],['trash','Thùng rác',History,'owner'],['settings','Cài đặt & sao lưu',Settings,'settings_manage']] as const;
+const nav=[['overview','Tổng quan',LayoutDashboard,''],['personal','Hồ sơ cá nhân',UserRound,''],['students','Võ sinh',Users,'students_direct'],['rank-cards','Thẻ đẳng cấp',ShieldCheck,'rank_cards_manage'],['attendance','Điểm danh',ClipboardCheck,'attendance_manage'],['diligence','Chuyên cần',FileBarChart,'attendance_manage'],['tuition','Học phí',Wallet,'tuition_manage'],['classes','Lớp học',School,'classes_manage'],['gear','Võ phục & dụng cụ',ShoppingBag,'gear_manage'],['tournaments','Thi đấu',Trophy,'tournaments_manage'],['approvals','Phê duyệt',ShieldCheck,'approvals_manage'],['reports','Báo cáo',FileBarChart,'reports_export'],['accounts','Tài khoản',UserRound,'owner'],['trash','Thùng rác',History,'owner'],['settings','Cài đặt & sao lưu',Settings,'settings_manage']] as const;
 const money=(n:any)=>Number(n||0).toLocaleString('vi-VN')+' đ';
 const norm=(x:any)=>String(x||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D').toLowerCase();
 const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Ho_Chi_Minh',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const statusName:Record<string,string>={present:'Có mặt',absent:'Vắng',excused:'Có phép',unmarked:'Chưa điểm danh'};
-const permLabels:Record<string,string>={students_direct:'Quản lý võ sinh',attendance_manage:'Điểm danh',tuition_manage:'Học phí',classes_manage:'Lớp học',gear_manage:'Võ phục & dụng cụ',tournaments_manage:'Thi đấu',approvals_manage:'Phê duyệt',reports_export:'Xuất báo cáo',settings_manage:'Cài đặt'};
+const permLabels:Record<string,string>={students_direct:'Quản lý võ sinh',rank_cards_manage:'Thẻ đẳng cấp',attendance_manage:'Điểm danh',tuition_manage:'Học phí',classes_manage:'Lớp học',gear_manage:'Võ phục & dụng cụ',tournaments_manage:'Thi đấu',approvals_manage:'Phê duyệt',reports_export:'Xuất báo cáo',settings_manage:'Cài đặt'};
 const kindLabel:Record<string,string>={student:'võ sinh',class:'lớp học',attendance:'điểm danh',tuition:'học phí',account:'tài khoản',config:'cài đặt',gear:'đơn hàng',tournament:'thi đấu',approval:'yêu cầu',backup:'bản sao lưu'};
 function download(blob:Blob,name:string){const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),10000)}
 function Field({label,children}:any){return <label className="field"><span>{label}</span>{children}</label>}
@@ -67,7 +69,8 @@ export default function ClubApp(){
  const [studentImportBusy,setStudentImportBusy]=useState(false);
  const classes=list('class'),accounts=list('account'),sessions=list('attendance');
  const permitted=(p:string)=>actor?.isSuperAdmin||!p||actor?.permissions?.[p]===true;
- const visibleNav=nav.filter(n=>n[0]==='diligence'?(permitted('attendance_manage')||permitted('reports_export')||permitted('students_direct')):n[3]==='owner'?actor?.isSuperAdmin:permitted(n[3]));
+ const rankCardsAllowed=rankCardAllowed(actor);
+ const visibleNav=nav.filter(n=>n[0]==='rank-cards'?rankCardsAllowed:n[0]==='diligence'?(permitted('attendance_manage')||permitted('reports_export')||permitted('students_direct')):n[3]==='owner'?actor?.isSuperAdmin:permitted(n[3]));
  const coachLabel=(c:any,id:string)=>accounts.find(a=>a.id===id)?.data.name||c.coachNames?.[id]||(id===primaryCoach(c)?c.coach:'')||'Tài khoản không còn tồn tại';
  const coachName=(c:RecordRow)=>coachIds(c.data).length?coachLabel(c.data,primaryCoach(c.data)):c.data.coach||'Chưa phân công';
  const assignableCoaches=accounts.filter(a=>a.data.status==='active');
@@ -150,6 +153,30 @@ export default function ClubApp(){
   }catch(e:any){setError(e.message)}finally{setExportBusy(false)}
  }
  async function assignSavedPhoto(account:RecordRow,uid:string){if(!actor?.isSuperAdmin||account.data.isSuperAdmin||pending)return;const email=String(account.data.email||'').trim().toLowerCase();if(!email){setError('Gắn email đăng nhập cho tài khoản trước khi liên kết ảnh.');return}const photo=availablePhotos.find(p=>p.uid===uid);if(uid&&!photo){setError('Ảnh đã được liên kết hoặc thay đổi. Bấm Tải lại ảnh.');return}const result=await save('account',account.id,{...account.data,photoProfileUid:uid,photoProfileEmail:uid?email:''},account.version);if(result)tell(uid?'Đã liên kết ảnh với '+account.data.name+'.':'Đã bỏ liên kết ảnh cũ.')}
+ async function rankCardState(edit=false){
+  const remote=await readState();
+  if(!rankCardAllowed(remote.actor,edit))throw new Error('Tài khoản không có quyền thực hiện thao tác thẻ đẳng cấp.');
+  const current:RecordRow[]=remote.records;
+  return {current,record:current.find(r=>r.kind==='config'&&!r.data.deleted)};
+ }
+ async function saveRankCard(template:RankCardTemplate,previous:string){
+  const {record}=await rankCardState(true);
+  if(JSON.stringify(normalizeCard(record?.data.rankCardTemplate))!==previous)
+   throw new Error('Phôi đã thay đổi trên thiết bị khác. Hủy chỉnh sửa để mở lại phôi mới.');
+  const {record:confirmed}=await mutate({kind:'config',id:record?.id||'club',
+   data:{...record?.data,rankCardTemplate:template},version:record?.version||0});
+  setState((current:any)=>current?{...current,records:applyConfirmedRecord(current.records,confirmed)}:current);
+ }
+ async function loadRankCards(ids:string[]){
+  const {current,record}=await rankCardState();
+  const template=normalizeCard(record?.data.rankCardTemplate);
+  if(!template.image)throw new Error('Chưa có phôi thẻ đang sử dụng.');
+  const classes=current.filter(r=>r.kind==='class'&&!r.data.deleted);
+  const students=ids.map(id=>current.find(r=>r.kind==='student'&&r.id===id&&!r.data.deleted&&
+   classes.some(c=>c.id===r.data.classId)));
+  if(students.some(r=>!r))throw new Error('Có hồ sơ đã thay đổi hoặc nằm ngoài lớp được cấp. Hãy tải lại danh sách.');
+  return {template,classes,students:students as RecordRow[]};
+ }
  function switchTab(key:string){setTab(key);if(key==='accounts')setPhotoReload(n=>n+1);setMenu(false);setQuery('');setClassFilter('');setError('');window.scrollTo({top:0,behavior:'auto'})}
  const tuition=list('tuition').filter(t=>t.data.month===month),paid=tuition.filter(t=>t.data.status==='paid'||t.data.status==='discount');
  const totalPaid=paid.reduce((n,r)=>n+Number(r.data.amount||0),0);
@@ -196,6 +223,9 @@ export default function ClubApp(){
  </>}
  {tab==='personal'&&<PersonalProfile actor={actor} photo={personalPhoto} onSaved={setPersonalPhoto} needsRules={photoNeedsRules}/>}
  {tab==='overview'&&(permitted('attendance_manage')||permitted('students_direct')||permitted('reports_export'))&&<AbsenceAlerts students={students} sessions={sessions} className={className} onStudent={permitted('students_direct')?(s:any)=>open('student',s):undefined}/>}
+ {tab==='rank-cards'&&rankCardsAllowed&&<RankCards students={allStudents.filter(s=>classes.some(c=>c.id===s.data.classId))}
+  classes={classes} template={config.rankCardTemplate} mayEdit={rankCardAllowed(actor,true)}
+  onSave={saveRankCard} loadForPrint={loadRankCards}/>}
  {tab==='diligence'&&<AttendanceInsights students={allStudents} sessions={sessions} classes={classes} className={className}/>}
  {tab==='students'&&<><div className="section-toolbar"><p>Xuất theo bộ lọc lớp, trạng thái và tìm kiếm đang chọn</p><div className="student-excel-buttons">{permitted('students_direct')&&<StudentExcelImport records={records} classes={classes} today={today()} busy={studentImportBusy} onBusy={setStudentImportBusy} onSave={async write=>{
   const {record}=await mutate({kind:'student',...write});
