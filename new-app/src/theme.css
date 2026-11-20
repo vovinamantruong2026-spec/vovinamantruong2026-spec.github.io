@@ -369,3 +369,9 @@
 .rank-card-visibility label { display:flex; align-items:center; gap:.4rem; }
 .rank-card-profile-link { margin-top:.65rem; }
 .rank-card-profile-link p { margin:.25rem 0 .6rem; }
+
+.rank-card-number { display:grid; align-content:start; gap:.35rem; flex:1 1 8rem; min-width:0; }
+.rank-card-number > input[type="range"] { width:100%; }
+.rank-card-number-entry { display:flex; align-items:center; gap:.4rem; }
+.rank-card-number-entry input { width:5rem; padding:.35rem .5rem; }
+.rank-card-number-entry input[aria-invalid="true"] { border-color:#b91c1c; }
