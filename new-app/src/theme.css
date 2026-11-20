@@ -364,3 +364,4 @@
 .rank-card-editor .rank-card-toggle { display:flex; align-items:center; }
 .rank-print-frame { position:fixed; width:1px; height:1px; inset:auto auto 0 0; border:0; opacity:0; pointer-events:none; }
 @media(max-width:850px) { .rank-card-grid { grid-template-columns:minmax(0,1fr); } }
+.rank-card-side-picker, .rank-card-print-mode { margin-bottom:.85rem; }

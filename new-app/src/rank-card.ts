@@ -7,10 +7,19 @@ export const cardFields = {
  name:'Họ và tên', code:'Mã võ sinh', dob:'Ngày sinh', belt:'Cấp đai', className:'Lớp học', photo:'Ảnh đại diện',
 } as const;
 export type CardField = keyof typeof cardFields;
-export type Slot = {enabled:boolean; x:number; y:number; size:number};
-export type RankCardTemplate = {
- image:string; widthMm:number; heightMm:number; color:string; slots:Record<CardField,Slot>;
+export type Slot = {enabled:boolean; x:number; y:number; size:number; width?:number; fontMm?:number; color?:string};
+export const extraSources = {
+ text:'Nội dung nhập tay', joinDate:'Ngày vào CLB', phone:'Điện thoại', parent:'Phụ huynh',
+ address:'Địa chỉ', status:'Trạng thái học',
+} as const;
+export type ExtraSource=keyof typeof extraSources;
+export type ExtraField={id:string; label:string; source:ExtraSource; text:string; slot:Slot};
+export type CardSide={image:string; slots:Record<CardField,Slot>; extras?:ExtraField[]};
+export type RankCardTemplate = CardSide & {
+ widthMm:number; heightMm:number; color:string; back?:CardSide;
 };
+export const extraLimit=20;
+export const newExtraSlot:Slot={enabled:true,x:15,y:22,size:5,width:75,fontMm:3};
 export const cardKeys = Object.keys(cardFields) as CardField[];
 export const maxTemplateBytes = 120_000;
 export const defaultCard: RankCardTemplate = {
@@ -28,23 +37,49 @@ export const defaultCard: RankCardTemplate = {
 const numberIn = (value: unknown, fallback:number, min:number, max:number) =>
  typeof value==='number' && Number.isFinite(value) && value>=min && value<=max ? value : fallback;
 
-export function normalizeCard(value?: RankCardTemplate): RankCardTemplate {
- const image = value?.image;
+const validColor=(value:unknown):value is string=>typeof value==='string'&&/^#[0-9a-f]{6}$/i.test(value);
+const safeImage=(value:unknown)=>typeof value==='string' && value.length<=maxTemplateBytes &&
+ /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(value)?value:'';
+
+function normalizeSlot(value:Slot|undefined,fallback:Slot,maxSize=20):Slot {
  return {
-  image: typeof image==='string' && image.length<=maxTemplateBytes && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(image) ? image : '',
+  enabled:typeof value?.enabled==='boolean'?value.enabled:fallback.enabled,
+  x:numberIn(value?.x,fallback.x,0,95), y:numberIn(value?.y,fallback.y,0,95),
+  size:numberIn(value?.size,fallback.size,2,maxSize),
+  ...(value?.width!==undefined?{width:numberIn(value.width,60,3,100)}:{}),
+  ...(value?.fontMm!==undefined?{fontMm:numberIn(value.fontMm,3,0.5,20)}:{}),
+  ...(validColor(value?.color)?{color:value.color}:{}),
+ };
+}
+
+export function emptyBack():CardSide {
+ return {image:'',slots:Object.fromEntries(cardKeys.map(key=>[key,{...defaultCard.slots[key],enabled:false}])) as CardSide['slots'],extras:[]};
+}
+
+function normalizeSide(value:CardSide|undefined,base:CardSide):CardSide {
+ const ids=new Set<string>();
+ const extras:ExtraField[]=[];
+ for(const item of (Array.isArray(value?.extras)?value.extras.slice(0,extraLimit):[])) {
+  if(!item||typeof item.id!=='string'||!/^[a-z0-9-]{1,50}$/i.test(item.id)||ids.has(item.id)||!Object.prototype.hasOwnProperty.call(extraSources,item.source))continue;
+  ids.add(item.id);
+  extras.push({id:item.id,label:typeof item.label==='string'?item.label.slice(0,60):'Trường bổ sung',
+   source:item.source,text:typeof item.text==='string'?item.text.slice(0,240):'',slot:normalizeSlot(item.slot,newExtraSlot)});
+ }
+ const slots=Object.fromEntries(cardKeys.map(key=>[key,normalizeSlot(value?.slots?.[key],base.slots[key],key==='photo'?85:20)])) as CardSide['slots'];
+ return {image:safeImage(value?.image),slots,...(extras.length?{extras}:{})};
+}
+
+export function normalizeCard(value?: RankCardTemplate): RankCardTemplate {
+ return {
+  ...normalizeSide(value,defaultCard),
   widthMm:numberIn(value?.widthMm,85.6,30,190),
   heightMm:numberIn(value?.heightMm,54,20,270),
-  color:/^#[0-9a-f]{6}$/i.test(value?.color ?? '') ? value!.color : defaultCard.color,
-  slots:Object.fromEntries(cardKeys.map(key=>{
-   const slot=value?.slots?.[key], fallback=defaultCard.slots[key];
-   return [key,{
-    enabled:typeof slot?.enabled==='boolean'?slot.enabled:fallback.enabled,
-    x:numberIn(slot?.x,fallback.x,0,95),
-    y:numberIn(slot?.y,fallback.y,0,95),
-    size:numberIn(slot?.size,fallback.size,2,key==='photo'?85:20),
-   }];
-  })) as RankCardTemplate['slots'],
+  color:validColor(value?.color)?value.color:defaultCard.color,
+  ...(value?.back?{back:normalizeSide(value.back,emptyBack())}:{}),
  };
+}
+export function sideTemplate(template:RankCardTemplate,side:'front'|'back'):RankCardTemplate {
+ return side==='front'?template:{widthMm:template.widthMm,heightMm:template.heightMm,color:template.color,...(template.back??emptyBack())};
 }
 
 async function loadImage(src:string) {
@@ -88,7 +123,15 @@ export function studentCardValues(data:any,className:string): Record<Exclude<Car
  };
 }
 
-export async function drawRankCard(template:RankCardTemplate,values:ReturnType<typeof studentCardValues>,photo?:Blob) {
+export function extraCardValues(data:any): Record<Exclude<ExtraSource,'text'>,string> {
+ const date=String(data.joinDate||'');
+ return {joinDate:/^\d{4}-\d{2}-\d{2}$/.test(date)?date.split('-').reverse().join('/'):date,
+  phone:String(data.phone||''),parent:String(data.parent||''),address:String(data.address||''),
+  status:String(data.name?(data.enrollmentStatus==='withdrawn'?'Đã nghỉ':'Đang học'):'')};
+}
+
+export async function drawRankCard(template:RankCardTemplate,values:ReturnType<typeof studentCardValues>,photo?:Blob,
+ extra?:ReturnType<typeof extraCardValues>) {
  const canvas=document.createElement('canvas');
  canvas.width=Math.ceil(template.widthMm*12);
  canvas.height=Math.ceil(template.heightMm*12);
@@ -107,14 +150,14 @@ export async function drawRankCard(template:RankCardTemplate,values:ReturnType<t
    ctx.drawImage(image,(image.naturalWidth-side)/2,(image.naturalHeight-side)/2,side,side,slot.x*w/100,slot.y*h/100,size,size);
   } finally { URL.revokeObjectURL(url); }
  }
- ctx.fillStyle=template.color;
  ctx.textBaseline='top';
- for(const key of cardKeys) {
-  if(key==='photo'||!template.slots[key].enabled)continue;
-  const position=template.slots[key], value=values[key];
-  const maxWidth=w*(98-position.x)/100;
-  let px=Math.min(Math.round(position.size*h/100),(100-position.y)*h/100);
-  const font=()=>{ctx.font=(key==='name'?'bold ':'')+px+'px Arial, sans-serif';};
+ function text(value:string,position:Slot,bold=false) {
+  if(!position.enabled||!value)return;
+  const maxWidth=w*Math.min(98-position.x,position.width??100)/100;
+  ctx.fillStyle=position.color??template.color;
+  const availableHeight=(100-position.y)*h/100;
+  let px=Math.min(position.fontMm?position.fontMm*h/template.heightMm:position.size*h/100,availableHeight);
+  const font=()=>{ctx.font=(bold?'bold ':'')+px+'px Arial, sans-serif';};
   font();
   if(ctx.measureText(value).width>maxWidth) {
    px=Math.max(1,px*maxWidth/ctx.measureText(value).width);
@@ -122,10 +165,32 @@ export async function drawRankCard(template:RankCardTemplate,values:ReturnType<t
   }
   ctx.fillText(value,position.x*w/100,position.y*h/100,maxWidth);
  }
+ for(const key of cardKeys)if(key!=='photo')text(values[key],template.slots[key],key==='name');
+ for(const field of template.extras??[])text(field.source==='text'?field.text:extra?.[field.source]??'',field.slot);
  return canvas.toDataURL('image/png');
 }
 
-export async function printRankCards(images:string[],template:RankCardTemplate) {
+const pageWidth=194;
+const pageHeight=281;
+const gap=3;
+export function cardPages(front:string[],template:RankCardTemplate,backs?:string[]) {
+ if(backs&&backs.length!==front.length)throw new Error('Số thẻ mặt trước và mặt sau không khớp.');
+ const columns=Math.max(1,Math.floor((pageWidth+gap)/(template.widthMm+gap)));
+ const rows=Math.max(1,Math.floor((pageHeight+gap)/(template.heightMm+gap)));
+ const perPage=columns*rows;
+ const pages:{src:string;x:number;y:number}[][]=[];
+ for(let start=0;start<front.length;start+=perPage) {
+  const placements=(images:string[],mirror:boolean)=>images.slice(start,start+perPage).map((src,index)=>{
+   const x=(index%columns)*(template.widthMm+gap),y=Math.floor(index/columns)*(template.heightMm+gap);
+   return {src,x:mirror?pageWidth-template.widthMm-x:x,y};
+  });
+  pages.push(placements(front,false));
+  if(backs)pages.push(placements(backs,true));
+ }
+ return pages;
+}
+export async function printRankCards(images:string[],template:RankCardTemplate,backs?:string[]) {
+ const pages=cardPages(images,template,backs);
  const frame=document.createElement('iframe');
  frame.title='In thẻ đẳng cấp';
  frame.className='rank-print-frame';
@@ -135,17 +200,20 @@ export async function printRankCards(images:string[],template:RankCardTemplate) 
   if(!doc||!view)throw new Error('Không mở được bản in.');
   doc.title='Thẻ đẳng cấp võ sinh';
   const style=doc.createElement('style');
-  style.textContent='@page{size:A4;margin:8mm}body{margin:0;display:flex;align-content:flex-start;flex-wrap:wrap;gap:3mm}img{display:block;break-inside:avoid;page-break-inside:avoid}';
+  style.textContent='@page{size:A4;margin:8mm}body{margin:0}.print-sheet{position:relative;width:194mm;height:280.5mm;break-after:page}.print-sheet:last-child{break-after:auto}.print-sheet img{position:absolute;display:block}';
   doc.head.append(style);
-  await Promise.all(images.map(async src=>{
-   const image=doc.createElement('img');
-   image.alt='Thẻ đẳng cấp';
-   image.style.width=template.widthMm+'mm';
-   image.style.height=template.heightMm+'mm';
-   image.src=src;
-   doc.body.append(image);
-   await image.decode();
-  }));
+  const pending:Promise<void>[]=[];
+  for(const placements of pages) {
+   const sheet=doc.createElement('div');sheet.className='print-sheet';doc.body.append(sheet);
+   for(const placement of placements) {
+    const image=doc.createElement('img');
+    image.alt='Thẻ đẳng cấp';
+    image.style.cssText='width:'+template.widthMm+'mm;height:'+template.heightMm+'mm;left:'+placement.x+'mm;top:'+placement.y+'mm';
+    image.src=placement.src;
+    sheet.append(image);pending.push(image.decode());
+   }
+  }
+  await Promise.all(pending);
   const cleanup=()=>frame.remove();
   view.addEventListener('afterprint',cleanup,{once:true});
   window.setTimeout(cleanup,120000);

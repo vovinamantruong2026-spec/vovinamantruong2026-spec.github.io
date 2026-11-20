@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {defaultCard, drawRankCard, normalizeCard, rankCardAllowed, studentCardValues} from '../src/rank-card.ts';
+import {cardPages, defaultCard, drawRankCard, emptyBack, extraCardValues, normalizeCard, rankCardAllowed, sideTemplate, studentCardValues} from '../src/rank-card.ts';
 
 assert.equal(rankCardAllowed(null),false);
 assert.equal(rankCardAllowed({permissions:{reports_export:true,settings_manage:true}}),false);
@@ -29,4 +29,25 @@ assert.equal(commands.filter(r=>r[0]==='image').length,2);
 commands.length=0;
 await drawRankCard({...defaultCard,image:background,slots:{...defaultCard.slots,code:{...defaultCard.slots.code,enabled:false}}},values);
 assert.equal(commands.some(r=>r[1]==='VVN.1234'),false);
+const layout=normalizeCard({...defaultCard,image:background,back:{...emptyBack(),image:background,extras:[
+ {id:'issuer',label:'Đơn vị cấp',source:'text',text:'CLB An Trường',slot:{enabled:true,x:12,y:20,size:5,fontMm:4,color:'#112233',width:50}},
+ {id:'join',label:'Ngày vào CLB',source:'joinDate',text:'',slot:{enabled:true,x:12,y:32,size:5}},
+]}});
+assert.equal(layout.slots.name.enabled,true);
+assert.equal(layout.back.slots.name.enabled,false);
+assert.equal(layout.back.extras[0].slot.fontMm,4);
+assert.equal(layout.back.extras[0].slot.color,'#112233');
+commands.length=0;
+await drawRankCard(sideTemplate(layout,'back'),values,undefined,extraCardValues({joinDate:'2024-08-17'}));
+assert.deepEqual(commands.filter(r=>r[0]==='text').map(r=>r[1]),['CLB An Trường','17/08/2024']);
+const pages=cardPages(['F1','F2','F3'],layout,['B1','B2','B3']);
+assert.equal(pages.length,2);
+for(let i=0;i<3;i++){
+ assert.equal(pages[1][i].src,'B'+(i+1));
+ assert.equal(pages[0][i].y,pages[1][i].y);
+ assert.ok(Math.abs(pages[0][i].x+pages[1][i].x+layout.widthMm-194)<0.001);
+}
+const multi=cardPages(Array.from({length:11},(_,i)=>'F'+i),layout,Array.from({length:11},(_,i)=>'B'+i));
+assert.deepEqual(multi.map(p=>p[0].src),['F0','B0','F8','B8']);
+assert.throws(()=>cardPages(['F1'],layout,[]));
 console.log('PASS: card permissions, physical sizing, safe template, field mapping, photo and hidden fields');
