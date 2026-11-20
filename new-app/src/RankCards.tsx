@@ -61,7 +61,7 @@ export default function RankCards({students,classes,template,mayEdit,onSave,load
 
  const extraValues=JSON.stringify(extraCardValues(example?.data??{}));
  const exampleValues=JSON.stringify(studentCardValues(example?.data??{
-  name:'Nguyễn Văn Mẫu',id:'VVN.0001',dob:'2014-05-12',belt:'Tự vệ nhập môn',
+  name:'Nguyễn Văn Mẫu',id:'VVN.0001',dob:'2014-05-12',belt:'Tự vệ nhập môn',examDate:'2026-11-20',
  },className||(!example?'Lớp mẫu':'')));
  useEffect(()=>{
   let active=true;
