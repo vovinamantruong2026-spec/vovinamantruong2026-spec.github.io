@@ -15,7 +15,7 @@ service cloud.firestore {
    return live(a) && (a.isSuperAdmin == true ||
     (r.kind == 'account' && r.id == a.id) || r.kind == 'config' ||
     (r.kind == 'class' && inClass(a,r.id)) ||
-    (r.kind == 'student' && inClass(a,r.data.classId) && (has(a,'students_direct') || has(a,'attendance_manage') || has(a,'tuition_manage') || has(a,'reports_export') || has(a,'gear_manage') || has(a,'tournaments_manage') || has(a,'approvals_manage'))) ||
+    (r.kind == 'student' && inClass(a,r.data.classId) && (has(a,'students_direct') || has(a,'students_unlock') || has(a,'attendance_manage') || has(a,'tuition_manage') || has(a,'reports_export') || has(a,'gear_manage') || has(a,'tournaments_manage') || has(a,'approvals_manage'))) ||
     (r.kind == 'attendance' && inClass(a,r.data.classId) && (has(a,'attendance_manage') || has(a,'reports_export'))) ||
     (r.kind == 'tuition' && inClass(a,r.data.classId) && has(a,'tuition_manage')) ||
     (r.kind == 'gear' && inClass(a,r.data.classId) && has(a,'gear_manage')) ||
@@ -33,6 +33,23 @@ service cloud.firestore {
     (r.kind == 'gear' && inClass(a,r.data.classId) && has(a,'gear_manage')) ||
     (r.kind == 'tournament' && inClass(a,r.data.classId) && has(a,'tournaments_manage')) ||
     (r.kind == 'approval' && inClass(a,r.data.classId) && has(a,'approvals_manage')));
+  }
+  function canUnlockStudent(cid) {
+   let a = me();
+   let c = get(/databases/$(database)/documents/clubs/antruong-v2/records/$('class--' + cid)).data.data;
+   return live(a) && !maintenance() && inClass(a,cid) &&
+    (has(a,'students_unlock') || (c.get('deleted',false) == false &&
+     (a.id == c.get('coachAccountId','') || a.id in c.get('coachAccountIds',[]))));
+  }
+  function unlocksStudent(r) {
+   let old = resource.data;
+   let lock = old.data.get('absenceLock',{});
+   return old.kind == 'student' && old.data.get('deleted',false) == false &&
+    lock.get('locked',false) == true && canUnlockStudent(old.data.classId) &&
+    r.data.diff(old.data).affectedKeys().hasOnly(['absenceLock']) &&
+    r.data.absenceLock == {'locked':false,'through':lock.through,'streak':lock.streak,'unlockedAt':request.time} &&
+    r.kind == old.kind && r.id == old.id && r.version == old.version + 1 &&
+    valid(r) && hasAudit(r);
   }
   function reserved(r) { return r.kind != 'student' || getAfter(/databases/$(database)/documents/clubs/antruong-v2/studentCodes/$('code-' + r.data.id.lower())).data.studentUid == r.id; }
   function restoring() { return owner() && maintenance(); }
@@ -110,9 +127,10 @@ service cloud.firestore {
   match /clubs/antruong-v2/records/{key} {
    allow get: if active() && (!exists(/databases/$(database)/documents/clubs/antruong-v2/records/$(key)) || readRecord(resource.data));
    allow list: if owner() || readRecord(resource.data);
-   allow create: if key == request.resource.data.kind + '--' + request.resource.data.id && valid(request.resource.data) && writeRecord(request.resource.data) && trashAllowed(request.resource.data) && (reserved(request.resource.data) || (owner() && request.resource.data.get('imported',false) == true && !exists(/databases/$(database)/documents/clubs/antruong-v2/meta/studentCodes))) && request.resource.data.version == 1 && ((owner() && request.resource.data.get('imported',false) == true) || hasAudit(request.resource.data));
+   allow create: if !request.resource.data.data.keys().hasAny(['absenceLock']) && key == request.resource.data.kind + '--' + request.resource.data.id && valid(request.resource.data) && writeRecord(request.resource.data) && trashAllowed(request.resource.data) && (reserved(request.resource.data) || (owner() && request.resource.data.get('imported',false) == true && !exists(/databases/$(database)/documents/clubs/antruong-v2/meta/studentCodes))) && request.resource.data.version == 1 && ((owner() && request.resource.data.get('imported',false) == true) || hasAudit(request.resource.data));
    allow update: if resource.data.kind == 'student' && request.resource.data.data.get('deleted',false) == true && resource.data.data.get('deleted',false) == false && approvedStudentDeletion(request.resource.data) && valid(request.resource.data) && request.resource.data.kind == resource.data.kind && request.resource.data.id == resource.data.id && request.resource.data.version == resource.data.version + 1 && hasAudit(request.resource.data);
-   allow update: if !(resource.data.kind == 'student' && request.resource.data.data.get('deleted',false) == true && resource.data.data.get('deleted',false) == false) && key == request.resource.data.kind + '--' + request.resource.data.id && valid(request.resource.data) && writeRecord(resource.data) && writeRecord(request.resource.data) && trashAllowed(request.resource.data) && !(resource.data.kind == 'account' && resource.data.data.get('isSuperAdmin',false) == true) && reserved(request.resource.data) && request.resource.data.id == resource.data.id && request.resource.data.kind == resource.data.kind && request.resource.data.version == resource.data.version + 1 && hasAudit(request.resource.data);
+   allow update: if unlocksStudent(request.resource.data);
+   allow update: if (resource.data.kind != 'student' || request.resource.data.data.get('absenceLock',null) == resource.data.data.get('absenceLock',null)) && !(resource.data.kind == 'student' && request.resource.data.data.get('deleted',false) == true && resource.data.data.get('deleted',false) == false) && key == request.resource.data.kind + '--' + request.resource.data.id && valid(request.resource.data) && writeRecord(resource.data) && writeRecord(request.resource.data) && trashAllowed(request.resource.data) && !(resource.data.kind == 'account' && resource.data.data.get('isSuperAdmin',false) == true) && reserved(request.resource.data) && request.resource.data.id == resource.data.id && request.resource.data.kind == resource.data.kind && request.resource.data.version == resource.data.version + 1 && hasAudit(request.resource.data);
    allow create,update: if restoring() && valid(request.resource.data) && key == request.resource.data.kind + '--' + request.resource.data.id;
    allow delete: if restoring() || purgingTrash(resource.data,key);
   }

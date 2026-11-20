@@ -39,7 +39,7 @@ export default function Exams({records,students,save,pending,sync}:{
  const selectedStudents=new Set(rows.map(({entry})=>entry.studentUid));
  const savedStudents=new Set(rosters.flatMap(r=>savedEntries(r).map(entry=>entry.studentUid)));
  const candidateRoster=new Map(rosters.map(r=>[r.data.classId,r]));
- const candidates=students.filter(s=>candidateRoster.has(s.data.classId)&&(!filter||filter===s.data.classId)&&
+ const candidates=students.filter(s=>!s.data.absenceLock?.locked&&candidateRoster.has(s.data.classId)&&(!filter||filter===s.data.classId)&&
   (s.data.name+' '+s.data.id).toLocaleLowerCase('vi').includes(query.trim().toLocaleLowerCase('vi')));
  function update(roster:Rec,entries:Entry[]){
   setDraft(current=>({...current,[roster.id]:{entries,version:current[roster.id]?.version??roster.version}}));

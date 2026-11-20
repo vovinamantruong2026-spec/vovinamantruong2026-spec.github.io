@@ -14,6 +14,7 @@ import {logger} from 'firebase-functions';
 import {pipeline} from 'node:stream/promises';
 import {createGunzip} from 'node:zlib';
 import {ZONE,PREFIX,isOwnerProfile,performBackup} from './core.js';
+import {absenceLockCandidates} from './student-absence-lock.js';
 initializeApp();
 const bucketName=defineString('BACKUP_BUCKET',{description:'Private Cloud Storage bucket for weekly club backups',default:'clb-vovinam-antruong-2026-backups'});
 const root='clubs/antruong-v2';const region='asia-southeast1';
@@ -39,6 +40,33 @@ export const downloadWeeklyBackup=onRequest({region,serviceAccount,memory:'512Mi
  const trashed=await db().doc(root+'/backupTrash/weekly--'+id).get();if(trashed.exists&&expiredBackup(trashed.data(),new Date())){res.status(410).json({error:'Bản sao trong thùng rác đã hết hạn khôi phục.'});return}
  const file=bucket().file(PREFIX+id+'.json.gz');const [exists]=await file.exists();if(!exists){res.status(404).json({error:'Không tìm thấy bản sao.'});return}res.set('Content-Type','application/json; charset=utf-8');res.set('Content-Disposition',`attachment; filename="AnTruong_Weekly_${id}.json"`);await pipeline(file.createReadStream(),createGunzip(),res);
  }catch(e){logger.error('Backup download failed',{code:String(e.code||'unknown')});if(!res.headersSent)res.status(500).json({error:'Chưa tải được bản sao. Kiểm tra tác vụ máy chủ.'});else res.end()}
+});
+
+export const lockClubStudentsForAbsences=onSchedule({...options,schedule:'every 15 minutes'},async()=>{
+ const firestore=db();
+ const records=firestore.collection(root+'/records');
+ const classes=await records.where('kind','==','class').get();
+ const today=new Intl.DateTimeFormat('en-CA',{timeZone:ZONE,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+ for(const classroom of classes.docs){
+  if(classroom.data().data.deleted)continue;
+  let count;
+  do{
+   count=await firestore.runTransaction(async tx=>{
+    const maintenance=await tx.get(firestore.doc(root+'/meta/maintenance'));
+    const imported=await tx.get(firestore.doc(root+'/meta/import'));
+    if((maintenance.exists&&maintenance.data().state!=='ready')||imported.data()?.status!=='ready')return 0;
+    const scope=await tx.get(records.where('data.classId','==',classroom.data().id));
+    const candidates=absenceLockCandidates(scope.docs.map(d=>d.data()),today).slice(0,100);
+    for(const {record,lock} of candidates){
+     const audit=firestore.collection(root+'/audit').doc();
+     tx.update(records.doc('student--'+record.id),{data:{...record.data,absenceLock:lock},
+      version:record.version+1,updatedAt:FieldValue.serverTimestamp(),auditId:audit.id});
+     tx.set(audit,{actor:'Hệ thống điểm danh',actorUid:'system:absence-lock',action:'lock',kind:'student',record_id:record.id,at:FieldValue.serverTimestamp()});
+    }
+    return candidates.length;
+   });
+  }while(count===100);
+ }
 });
 
 export const cleanupClubTrash=onSchedule({region,timeZone:ZONE,memory:'256MiB',timeoutSeconds:540,maxInstances:1,concurrency:1,retryCount:3,minBackoffSeconds:60,schedule:'every 60 minutes'},async()=>{

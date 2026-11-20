@@ -23,7 +23,7 @@ function queries(a:any){
  const scoped=(kind:string,field='data.classId')=>{if(all)qs.push(query(collection(db,path+'/records'),where('kind','==',kind)));else for(let i=0;i<scopes.length;i+=30)qs.push(query(collection(db,path+'/records'),where('kind','==',kind),where(field,'in',scopes.slice(i,i+30))))};
  scoped('class','id');qs.push(query(collection(db,path+'/records'),where('kind','==','config')));
  if(a.isSuperAdmin)qs.push(query(collection(db,path+'/records'),where('kind','==','account')));else qs.push(query(collection(db,path+'/records'),where('kind','==','account'),where('id','==',a.id)));
- if(['students_direct','attendance_manage','tuition_manage','reports_export','gear_manage','tournaments_manage','approvals_manage'].some(p=>can(a,p)))scoped('student');
+ if(['students_direct','students_unlock','attendance_manage','tuition_manage','reports_export','gear_manage','tournaments_manage','approvals_manage'].some(p=>can(a,p)))scoped('student');
  if(can(a,'attendance_manage')||can(a,'reports_export'))scoped('attendance');
  for(const [kind,p] of [['tuition','tuition_manage'],['gear','gear_manage'],['tournament','tournaments_manage'],['approval','approvals_manage']])if(can(a,p))scoped(kind);
  return qs;
@@ -33,6 +33,20 @@ function assemble(a:any,docs:any[],extra:any={}){
  const previous=cached?.actor?.identityId===a.identityId&&cached?.actor?.isSuperAdmin===a.isSuperAdmin?cached:null;
  cached={actor:a,records:docs,revision:++revision,serverAt:new Date().toISOString(),audit:a.isSuperAdmin?previous?.audit||[]:[],backups:a.isSuperAdmin?previous?.backups||[]:[],migration:a.isSuperAdmin?previous?.migration||null:null,ownerDetailsReady:a.isSuperAdmin?previous?.ownerDetailsReady||false:false,...extra};return cached;
 }
+export async function unlockStudentAbsences(id:string){
+ const actor=await getActor();
+ const ref=recordRef('student',id);
+ const audit=doc(collection(db,path+'/audit'));
+ await runTransaction(db,async tx=>{
+  const current=(await tx.get(ref)).data();
+  if(!current?.data?.absenceLock?.locked)throw new Error('Võ sinh hiện không bị khóa do vắng tập.');
+  const {through,streak}=current.data.absenceLock;
+  tx.update(ref,{data:{...current.data,absenceLock:{locked:false,through,streak,unlockedAt:serverTimestamp()}},
+   version:current.version+1,updatedAt:serverTimestamp(),auditId:audit.id});
+  tx.set(audit,{actor:requireAuditName(actor),actorUid:actor.identityId,action:'unlock',kind:'student',record_id:id,at:serverTimestamp()});
+ });
+}
+
 export async function readState(){const a=await getActor();const snapshots=await Promise.all(queries(a).map(q=>getDocsFromServer(q)));return assemble(a,snapshots.flatMap(s=>s.docs.map(row)))}
 // Heavy owner-only lists are subscribed only while Settings is open.
 export function watchOwnerDetails(onDetails:(d:any)=>void,onError:(e:any)=>void){
