@@ -1,5 +1,5 @@
 import {ClubLogo} from './club-logo';
-import React,{useEffect,useState} from 'react';
+import {useEffect,useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {onAuthStateChanged,signInWithEmailAndPassword,signOut,setPersistence,browserLocalPersistence,sendPasswordResetEmail,createUserWithEmailAndPassword,sendEmailVerification,reload} from 'firebase/auth';
 import {auth} from './firebase';
@@ -10,7 +10,7 @@ import ClubApp from './ClubApp';
 import './style.css';
 import './theme.css';
 function App(){const [user,setUser]=useState<any>(undefined),[member,setMember]=useState(false),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),[info,setInfo]=useState(''),[register,setRegister]=useState(false),[confirm,setConfirm]=useState(''),[verification,setVerification]=useState(false);
- async function check(u:any){setMember(false);setVerification(false);if(!u)return;try{const a=await getActor();if(!u.emailVerified){setVerification(true);return}setMember(true)}catch(e:any){setError(e.message)}}
+ async function check(u:any){setMember(false);setVerification(false);if(!u)return;try{await getActor();if(!u.emailVerified){setVerification(true);return}setMember(true)}catch(e:any){setError(e.message)}}
  useEffect(()=>onAuthStateChanged(auth,u=>{setUser(u);setError('');void check(u)}),[]);
  async function login(e:any){e.preventDefault();setBusy(true);setError('');setInfo('');try{if(register&&(password.length<8||password!==confirm))throw new Error('Mật khẩu cần ít nhất 8 ký tự và hai lần nhập phải khớp.');await setPersistence(auth,browserLocalPersistence);auth.languageCode='vi';if(register){const c=await createUserWithEmailAndPassword(auth,email.trim().toLowerCase(),password);try{await sendEmailVerification(c.user);setInfo('Đã tạo tài khoản và gửi email xác minh. Mở thư, bấm liên kết rồi quay lại đây.')}catch{setInfo('Tài khoản đã tạo nhưng chưa gửi được thư. Bấm Gửi lại email xác minh.')}setVerification(true);setMember(false)}else{const c=await signInWithEmailAndPassword(auth,email.trim().toLowerCase(),password);startIdleSession(c.user.uid)}setPassword('');setConfirm('')}catch(e:any){const msgs:Record<string,string>={'auth/email-already-in-use':'Email này đã có tài khoản. Chọn Đăng nhập hoặc Quên mật khẩu.','auth/weak-password':'Mật khẩu chưa đủ mạnh theo chính sách của CLB.','auth/operation-not-allowed':'Chủ CLB cần bật Email/Password trong Firebase Authentication.','auth/too-many-requests':'Thao tác quá nhiều lần. Vui lòng thử lại sau.','auth/network-request-failed':'Không kết nối được Firebase. Kiểm tra mạng rồi thử lại.'};setError(msgs[e.code]||(!e.code?e.message:'Chưa đăng nhập được. Kiểm tra email và mật khẩu.'))}finally{setBusy(false)}}
  async function recheck(){setBusy(true);setError('');try{const u=auth.currentUser;if(!u)return;await reload(u);await u.getIdToken(true);await check(u)}catch{setError('Chưa kiểm tra được. Hãy thử lại.')}finally{setBusy(false)}}

@@ -1,9 +1,9 @@
 import {useState} from 'react';
+import type {ExamDetails} from './exam-award';
 
 type Rec={kind:string;id:string;data:any;version:number};
-type Entry={studentUid:string;name:string;code:string;fee:number;paid:boolean;result:'pending'|'pass'|'fail';belt?:string};
-export type ExamDetails={name:string;date:string;location:string;organization:string;fee:number};
-type Sync=(entries:Entry[],exam:ExamDetails)=>Promise<{saved:number;failures:string[]}>;
+export type Entry={studentUid:string;name:string;code:string;fee:number;paid:boolean;result:'pending'|'pass'|'fail';belt?:string;revokedBelt?:string;previousBelt?:string};
+type Sync=(entries:Entry[],exam:ExamDetails,examId:string,roster:Rec)=>Promise<{saved:number;failures:string[]}>;
 type Save=(kind:string,id:string,data:unknown,version:number)=>Promise<Rec|null>;
 type Settings=ExamDetails&{key:string;classIds:string[]};
 const examKey=(record:Rec)=>record.data.examGroup||record.id;
@@ -33,7 +33,9 @@ export default function Exams({records,students,save,pending,sync}:{
  const [retry,setRetry]=useState(false);
  const locked=pending||busy;
  const dirty=Object.keys(draft).length>0;
- const rows=rosters.flatMap(r=>(draft[r.id]?.entries??savedEntries(r)).map((entry:Entry)=>({r,entry})));
+ const savedByRoster=new Map(rosters.map(roster=>[roster.id,savedEntries(roster)]));
+ const profiles=new Map(records.filter(row=>row.kind==='student'&&!row.data.deleted).map(row=>[row.id,row.data]));
+ const rows=rosters.flatMap(r=>(draft[r.id]?.entries??savedByRoster.get(r.id)??[]).map((entry:Entry)=>({r,entry})));
  const visibleRows=rows.filter(({r})=>!filter||r.data.classId===filter);
  const className=(id:string)=>classes.find(c=>c.id===id)?.data.name??'Lớp cũ';
  const selectedStudents=new Set(rows.map(({entry})=>entry.studentUid));
@@ -72,28 +74,41 @@ export default function Exams({records,students,save,pending,sync}:{
   setBusy(true);
   setMessage('');
   const failures:string[]=[];
-  const passed:Entry[]=[];
+  let profileFailures=false;
   try{
    for(const r of rosters){
     const edit=draft[r.id];
-    const entries:Entry[]=edit?.entries??savedEntries(r);
+    const original=new Map(savedEntries(r).map(entry=>[entry.studentUid,entry]));
+    const entries=(edit?.entries??savedEntries(r)).map(entry=>{
+     const previous=original.get(entry.studentUid);
+     if(entry.result==='pass'&&entry.revokedBelt)return {...entry,revokedBelt:'',previousBelt:''};
+     if(entry.result!=='pass'&&previous?.result==='pass'){
+      return {...entry,revokedBelt:previous.belt??''};
+     }
+     return entry;
+    });
+    if(!sync&&entries.some(entry=>entry.result!=='pass'&&original.get(entry.studentUid)?.result==='pass')){
+     failures.push(className(r.data.classId)+': cần quyền quản lý hồ sơ võ sinh để sửa kết quả đã đỗ.');
+     continue;
+    }
     const valid=entries.every(row=>Number.isSafeInteger(row.fee)&&row.fee>=0&&
      (row.result!=='pass'||Boolean(row.belt?.trim())));
     if(!valid){failures.push(className(r.data.classId)+': kiểm tra lệ phí và cấp đai đạt.');continue}
     const saved=edit?await save('tournament',r.id,{...r.data,entries},edit.version):r;
     if(!saved){failures.push(className(r.data.classId)+': chưa lưu được danh sách.');continue}
     if(edit)setDraft(current=>{const next={...current};delete next[r.id];return next});
-    passed.push(...entries.filter(row=>row.result==='pass'));
-   }
-   let profileFailures=false;
-   if(passed.length&&sync){
+    const changes=entries.filter(row=>row.result==='pass'||row.revokedBelt);
+    if(!changes.length||!sync)continue;
     try{
-     const result=await sync(passed,exam.data);
-     profileFailures=result.failures.length>0;
+     const result=await sync(changes,saved.data,key,saved);
+     profileFailures ||= result.failures.length>0;
      failures.push(...result.failures);
-     if(!failures.length)setMessage('Đã xác nhận kết quả và cập nhật hồ sơ, thẻ đẳng cấp.');
-    }catch(error){profileFailures=true;failures.push(error instanceof Error?error.message:'Chưa cập nhật được hồ sơ.')}
-   }else if(!failures.length)setMessage('Đã lưu danh sách.');
+    }catch(error){
+     profileFailures=true;
+     failures.push(error instanceof Error?error.message:'Chưa cập nhật được hồ sơ.');
+    }
+   }
+   if(!failures.length)setMessage(sync?'Đã lưu kết quả và đồng bộ hồ sơ, thẻ đẳng cấp.':'Đã lưu danh sách.');
    setRetry(profileFailures);
    if(failures.length)setMessage(failures.join(' '));
   }finally{setBusy(false)}
@@ -153,11 +168,20 @@ export default function Exams({records,students,save,pending,sync}:{
     <div className="table-wrap"><table><thead><tr><th>STT</th><th>Võ sinh</th><th>Lớp</th><th>Kết quả</th><th>Cấp đai đạt</th><th>Lệ phí (đ)</th><th>Đóng lệ phí</th><th/></tr></thead><tbody>{visibleRows.map(({r,entry},index)=>{
      const list:Entry[]=draft[r.id]?.entries??savedEntries(r);
      const edit=(patch:Partial<Entry>)=>update(r,list.map(row=>row.studentUid===entry.studentUid?{...row,...patch}:row));
-     return <tr key={entry.studentUid}><td>{index+1}</td><td>{entry.name}<small className="subtext">{entry.code}</small></td><td>{className(r.data.classId)}</td>
-      <td><select aria-label={'Kết quả '+entry.name} value={entry.result} onChange={e=>edit({result:e.target.value as Entry['result']})}>
+     const previous=savedByRoster.get(r.id)?.find(row=>row.studentUid===entry.studentUid);
+     const student=profiles.get(entry.studentUid);
+     const legacyBelt=entry.revokedBelt||(previous?.result==='pass'?previous.belt:'');
+     const legacyCorrection=entry.result!=='pass'&&legacyBelt&&student&&
+      student.examSession===r.data.name&&student.examDate===r.data.date&&
+      student.organization===r.data.organization&&student.belt===legacyBelt&&
+      !student.examAwards?.length;
+     return <tr key={r.id+'_'+entry.studentUid}><td>{index+1}</td><td>{entry.name}<small className="subtext">{entry.code}</small></td><td>{className(r.data.classId)}</td>
+      <td><select disabled={!sync&&entry.result==='pass'} aria-label={'Kết quả '+entry.name} value={entry.result} onChange={e=>edit({result:e.target.value as Entry['result']})}>
        <option value="pending">Chưa có kết quả</option><option value="pass" disabled={!sync}>Đỗ</option><option value="fail">Trượt</option>
       </select></td>
-      <td><input aria-label={'Cấp đai đạt '+entry.name} maxLength={80} placeholder="Nhập cấp đai" value={entry.belt??''} onChange={e=>edit({belt:e.target.value})}/></td>
+      <td><input aria-label={'Cấp đai đạt '+entry.name} maxLength={80} placeholder="Nhập cấp đai" value={entry.belt??''} onChange={e=>edit({belt:e.target.value})}/>
+       {legacyCorrection&&<label>Cấp đai trước khóa thi cũ<input required maxLength={80}
+        value={entry.previousBelt??''} onChange={e=>edit({previousBelt:e.target.value})}/></label>}</td>
       <td><input aria-label={'Lệ phí '+entry.name} type="number" min="0" step="1" required value={Number.isNaN(entry.fee)?'':entry.fee} onChange={e=>edit({fee:e.target.valueAsNumber})}/></td>
       <td><select aria-label={'Đóng lệ phí '+entry.name} value={String(entry.paid)} onChange={e=>edit({paid:e.target.value==='true'})}><option value="false">Chưa đóng</option><option value="true">Đã đóng</option></select></td>
       <td>{!(r.data.entries??[]).some((row:Entry)=>row.studentUid===entry.studentUid)&&<button type="button" onClick={()=>update(r,list.filter(row=>row.studentUid!==entry.studentUid))}>Bỏ chọn</button>}</td>
@@ -166,7 +190,7 @@ export default function Exams({records,students,save,pending,sync}:{
     {!visibleRows.length&&<p className="muted">Chưa chọn võ sinh dự thi trong danh sách này.</p>}
     {!sync&&<p>Cần quyền quản lý hồ sơ võ sinh để xác nhận đỗ và cập nhật thẻ.</p>}
     <button className="primary" disabled={!dirty&&!retry}>{retry&&!dirty?'Thử cập nhật lại hồ sơ':'Lưu và xác nhận kết quả'}</button>
-    {sync&&!dirty&&!retry&&rows.some(({entry})=>entry.result==='pass')&&<button type="button" className="secondary" onClick={()=>void confirmResults()}>Cập nhật lại hồ sơ đã đỗ</button>}{' '}
+    {sync&&!dirty&&!retry&&rows.some(({entry})=>(entry.result==='pass'||entry.revokedBelt))&&<button type="button" className="secondary" onClick={()=>void confirmResults()}>Đồng bộ lại hồ sơ</button>}{' '}
     {dirty&&<button type="button" className="secondary" onClick={()=>setDraft({})}>Bỏ thay đổi</button>}
    </fieldset>
   </form>}

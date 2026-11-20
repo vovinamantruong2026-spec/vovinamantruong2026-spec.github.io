@@ -1,5 +1,5 @@
 import {profileDetails} from './profile-details';
-import {collection,doc,getDoc,getDocsFromServer,runTransaction,writeBatch,serverTimestamp,setDoc,deleteDoc} from 'firebase/firestore';
+import {collection,doc,getDoc,getDocsFromServer,runTransaction,serverTimestamp,setDoc,deleteDoc} from 'firebase/firestore';
 import {db,auth,clubId} from './firebase';
 import {recoveryPlan,sanitize} from './recovery-plan';
 import {codeReservations} from './student-codes';

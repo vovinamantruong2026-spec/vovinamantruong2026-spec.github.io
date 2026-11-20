@@ -4,7 +4,7 @@ import {db,clubId} from './firebase';
 import {prepareRecovery,recoveryPlanForUndo,restoreApp,readRecovery} from './recovery';
 import {ensureStudentCodes} from './student-codes';
 function download(data:any,id:string){const u=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=u;a.download='AnTruong_HoanTac_'+id+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(u),10000)}
-export default function RestorePanel({actor,onDone}:any){
+export default function RestorePanel({onDone}:any){
  const [prepared,setPrepared]=useState<any>(null),[confirm,setConfirm]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[progress,setProgress]=useState(''),[copies,setCopies]=useState<any[]>([]),[maintenance,setMaintenance]=useState<any>(null);
  useEffect(()=>onSnapshot(query(collection(db,'clubs/'+clubId+'/recovery'),orderBy('at','desc'),limit(10)),s=>setCopies(s.docs.map(d=>({id:d.id,...d.data()}))),()=>setError('Cần Publish Rules mới để dùng khôi phục và bản hoàn tác.')),[]);
  useEffect(()=>onSnapshot(doc(db,'clubs/'+clubId+'/meta/maintenance'),s=>setMaintenance(s.data()||null)),[]);

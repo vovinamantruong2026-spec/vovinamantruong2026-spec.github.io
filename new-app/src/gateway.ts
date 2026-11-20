@@ -4,7 +4,7 @@ import {oldHistory,historyCutoff} from './history-policy';
 import {purgeable,expiredTrash,trashTarget,sameTrashRevision} from './trash-policy';
 import {applyConfirmedRecord} from './record-state';
 import {readCoachTeam,coachTeamChanged,writeCoachAssignment} from './class-coach';
-import {collection,doc,getDoc,getDocFromServer,setDoc,getDocsFromServer,query,where,orderBy,limit,onSnapshot,runTransaction,writeBatch,serverTimestamp,deleteDoc,addDoc} from 'firebase/firestore';
+import {collection,doc,getDoc,getDocFromServer,setDoc,getDocsFromServer,query,where,orderBy,limit,onSnapshot,runTransaction,writeBatch,serverTimestamp} from 'firebase/firestore';
 import {auth,db,clubId} from './firebase';
 import {convertBackup} from './convert';
 import {captureApp} from './recovery';
@@ -95,6 +95,11 @@ export async function mutate(input:any,codeAttempt=0):Promise<any>{
  if(kind==='account'){data.email=String(data.email||'').trim().toLowerCase();if(data.email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email))throw new Error('Email chưa đúng định dạng.');if(data.email===a.email)throw new Error('Email chủ CLB đã được sử dụng.');}
  const auditRef=doc(collection(db,path+'/audit'));const ref=recordRef(kind,id);
  let result:any;try{result=await runTransaction(db,async tx=>{const maintenance=await tx.get(doc(db,path+'/meta/maintenance'));if(maintenance.exists()&&maintenance.data().state!=='ready')throw new Error('Đang bảo trì hoặc khôi phục dữ liệu. Hãy thử lại sau.');const current=await tx.get(ref);const existing=current.exists()?current.data():null;if((existing?.version||0)!==version)throw new Error('Bản ghi vừa được máy khác thay đổi. Tải phiên bản mới rồi sửa lại.');
+  if(kind==='student'&&input.examRoster){
+   const roster=await tx.get(recordRef('tournament',input.examRoster.id));
+   if(roster.data()?.version!==input.examRoster.version||roster.data()?.data?.deleted)
+    throw new Error('Kết quả khóa thi vừa thay đổi. Tải lại và đồng bộ theo kết quả mới.');
+  }
   if(kind==='attendance'){const stable=(v:any):any=>Array.isArray(v)?v.map(stable):v&&typeof v==='object'?Object.fromEntries(Object.keys(v).sort().filter(k=>!['deleted','deletedAt','deletedBy'].includes(k)).map(k=>[k,stable(v[k])])):v;const trashOnly=a.isSuperAdmin&&existing&&!!existing.data.deleted!==!!data.deleted&&JSON.stringify(stable(existing.data))===JSON.stringify(stable(data));if(!trashOnly)validate(kind,id,data,cached);}
   if(existing?.data?.isSuperAdmin&&kind==='account')throw new Error('Không thể khóa hoặc xóa tài khoản chủ CLB.');if(existing?.data?.deleted&&!a.isSuperAdmin)throw new Error('Hồ sơ đang ở thùng rác.');
   if(data.deleted===true&&!existing?.data?.deleted)data.deletedAt=serverTimestamp();
