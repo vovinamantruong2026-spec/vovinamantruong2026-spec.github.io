@@ -8,7 +8,7 @@ export const cardFields = {
  examSession:'Khóa thi', organization:'Đơn vị', photo:'Ảnh đại diện',
 } as const;
 export type CardField = keyof typeof cardFields;
-export type Slot = {enabled:boolean; x:number; y:number; size:number; width?:number; fontMm?:number; color?:string};
+export type Slot = {enabled:boolean; x:number; y:number; size:number; width?:number; fontMm?:number; color?:string; photoWidthMm?:number; photoHeightMm?:number};
 export const extraSources = {
  text:'Nội dung nhập tay', joinDate:'Ngày vào CLB', phone:'Điện thoại', parent:'Phụ huynh',
  address:'Địa chỉ', status:'Trạng thái học',
@@ -69,6 +69,9 @@ function normalizeSide(value:CardSide|undefined,base:CardSide):CardSide {
    source:item.source,text:typeof item.text==='string'?item.text.slice(0,240):'',slot:normalizeSlot(item.slot,newExtraSlot)});
  }
  const slots=Object.fromEntries(cardKeys.map(key=>[key,normalizeSlot(value?.slots?.[key],base.slots[key],key==='photo'?85:20)])) as CardSide['slots'];
+ const photo=value?.slots?.photo;
+ if(photo?.photoWidthMm!==undefined)slots.photo.photoWidthMm=numberIn(photo.photoWidthMm,20,1,190);
+ if(photo?.photoHeightMm!==undefined)slots.photo.photoHeightMm=numberIn(photo.photoHeightMm,30,1,270);
  return {image:safeImage(value?.image),slots,...(extras.length?{extras}:{})};
 }
 
@@ -117,6 +120,13 @@ export async function prepareCardImage(file:File) {
  } finally { URL.revokeObjectURL(url); }
 }
 
+export function examSessionOptions(students:readonly {data:{examSession?:unknown}}[]) {
+ return [...new Set(students.flatMap(({data})=>{
+  const name=typeof data.examSession==='string'?data.examSession.trim():'';
+  return name?[name]:[];
+ }))].sort((a,b)=>a.localeCompare(b,'vi',{numeric:true}));
+}
+
 export function studentCardValues(data:any,className:string): Record<Exclude<CardField,'photo'>,string> {
  const dob=String(data.dob || '');
  return {
@@ -136,21 +146,27 @@ export function extraCardValues(data:any): Record<Exclude<ExtraSource,'text'>,st
 
 export const rankCardPhotoMm={width:20,height:30} as const;
 
+export function photoSizeMm(slot:Slot) {
+ return {width:slot.photoWidthMm??rankCardPhotoMm.width,height:slot.photoHeightMm??rankCardPhotoMm.height};
+}
 export function rankCardPhotoLayout(template:RankCardTemplate, width:number, height:number) {
  const slot=template.slots.photo;
- const size=rankCardPhotoMm;
+ const size=photoSizeMm(slot);
  if(!slot.enabled||template.widthMm<size.width||template.heightMm<size.height)return null;
  const w=size.width*width/template.widthMm,h=size.height*height/template.heightMm;
  return {x:Math.min(slot.x*width/100,width-w),y:Math.min(slot.y*height/100,height-h),width:w,height:h};
 }
 
 export function rankCardPhotoFits(template:RankCardTemplate) {
- return [template,template.back].every(side=>!side?.image||!side.slots.photo.enabled||
-  (template.widthMm>=rankCardPhotoMm.width&&template.heightMm>=rankCardPhotoMm.height));
+ return [template,template.back].every(side=>{
+  if(!side?.image||!side.slots.photo.enabled)return true;
+  const size=photoSizeMm(side.slots.photo);
+  return template.widthMm>=size.width&&template.heightMm>=size.height;
+ });
 }
 
-export function rankCardPhotoCrop(width:number,height:number) {
- const ratio=rankCardPhotoMm.width/rankCardPhotoMm.height;
+export function rankCardPhotoCrop(width:number,height:number,size:{width:number;height:number}=rankCardPhotoMm) {
+ const ratio=size.width/size.height;
  const w=Math.min(width,height*ratio),h=Math.min(height,width/ratio);
  return {x:(width-w)/2,y:(height-h)/2,width:w,height:h};
 }
@@ -167,12 +183,12 @@ export async function drawRankCard(template:RankCardTemplate,values:ReturnType<t
  ctx.fillRect(0,0,w,h);
  if(template.image)ctx.drawImage(await loadImage(template.image),0,0,w,h);
  const placement=rankCardPhotoLayout(template,w,h);
- if(photo&&template.slots.photo.enabled&&!placement)throw new Error('Khổ thẻ quá nhỏ để đặt ảnh 2 × 3 cm.');
+ if(photo&&template.slots.photo.enabled&&!placement)throw new Error('Kích thước ảnh lớn hơn khổ thẻ.');
  if(photo&&placement) {
   const url=URL.createObjectURL(photo);
   try {
    const image=await loadImage(url);
-   const crop=rankCardPhotoCrop(image.naturalWidth,image.naturalHeight);
+   const crop=rankCardPhotoCrop(image.naturalWidth,image.naturalHeight,photoSizeMm(template.slots.photo));
    ctx.drawImage(image,crop.x,crop.y,crop.width,crop.height,placement.x,placement.y,placement.width,placement.height);
   } finally { URL.revokeObjectURL(url); }
  }

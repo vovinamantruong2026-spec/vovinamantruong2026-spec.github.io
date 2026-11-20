@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {cardPages, defaultCard, drawRankCard, emptyBack, extraCardValues, normalizeCard, rankCardAllowed, rankCardPhotoCrop, rankCardPhotoFits, rankCardPhotoLayout, sideTemplate, studentCardValues} from '../src/rank-card.ts';
+import {cardPages, defaultCard, drawRankCard, emptyBack, examSessionOptions, extraCardValues, normalizeCard, rankCardAllowed, rankCardPhotoCrop, rankCardPhotoFits, rankCardPhotoLayout, sideTemplate, studentCardValues} from '../src/rank-card.ts';
 
 assert.equal(rankCardAllowed(null),false);
 assert.equal(rankCardAllowed({permissions:{reports_export:true,settings_manage:true}}),false);
@@ -78,4 +78,16 @@ commands.length=0;
 await drawRankCard({...migrated,slots:{...migrated.slots,examSession:{...migrated.slots.examSession,enabled:true},
  organization:{...migrated.slots.organization,enabled:true}}},updatedExam);
 assert.deepEqual(commands.filter(r=>r[0]==='text').slice(-2).map(r=>r[1]),['Khóa 06','CLB An Trường']);
+const resized=normalizeCard({...defaultCard,image:background,slots:{
+ ...defaultCard.slots,photo:{...defaultCard.slots.photo,photoWidthMm:24,photoHeightMm:28},
+}});
+const resizedPhoto=rankCardPhotoLayout(resized,856,540);
+assert.ok(Math.abs(resizedPhoto.width-240)<1e-8);
+assert.ok(Math.abs(resizedPhoto.height-280)<1e-8);
+assert.deepEqual(rankCardPhotoCrop(400,200,{width:30,height:20}),{x:50,y:0,width:300,height:200});
+assert.equal(rankCardPhotoFits({...resized,back:{image:background,slots:{
+ ...emptyBack().slots,photo:{...emptyBack().slots.photo,enabled:true,photoWidthMm:90,photoHeightMm:25},
+}}}),false);
+assert.deepEqual(examSessionOptions([{data:{examSession:'Khóa 10'}},{data:{examSession:' Khóa 2 '}},
+ {data:{examSession:'Khóa 2'}},{data:{examSession:''}},{data:{}}]),['Khóa 2','Khóa 10']);
 console.log('PASS: card permissions, physical sizing, safe template, field mapping, photo and hidden fields');

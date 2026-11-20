@@ -2,12 +2,13 @@ import {useEffect, useMemo, useState} from 'react';
 import {Printer} from 'lucide-react';
 import RankCardFields from './RankCardFields';
 import {fetchStudentFile} from './student-files';
-import {drawRankCard,emptyBack,extraCardValues,normalizeCard,prepareCardImage,printRankCards,rankCardPhotoFits,sideTemplate,studentCardValues,type CardSide,type RankCardTemplate} from './rank-card';
+import {drawRankCard,emptyBack,examSessionOptions,extraCardValues,normalizeCard,prepareCardImage,printRankCards,rankCardPhotoFits,sideTemplate,studentCardValues,type CardSide,type RankCardTemplate} from './rank-card';
 
 type Row={id:string;data:any};
 type Props={
  students:Row[]; classes:Row[]; template?:RankCardTemplate; mayEdit:boolean; initialStudentId?:string;
  onLinkProfiles?:(ids:string[])=>Promise<{saved:number; failures:string[]}>;
+ onAssignExam?:(ids:string[],value:string)=>Promise<{saved:number;failures:string[]}>;
  onSave:(template:RankCardTemplate,previous:string)=>Promise<void>;
  loadForPrint:(ids:string[])=>Promise<{students:Row[];classes:Row[];template:RankCardTemplate}>;
 };
@@ -17,13 +18,15 @@ async function photoFor(student:Row,signal?:AbortSignal) {
  return typeof id==='string' && id ? fetchStudentFile(student.id,id,signal) : undefined;
 }
 
-export default function RankCards({students,classes,template,mayEdit,onSave,loadForPrint,initialStudentId,onLinkProfiles}:Props) {
+export default function RankCards({students,classes,template,mayEdit,onSave,loadForPrint,initialStudentId,onLinkProfiles,onAssignExam}:Props) {
  const saved=useMemo(()=>normalizeCard(template),[template]);
  const [draft,setDraft]=useState<RankCardTemplate|null>(null);
  const [original,setOriginal]=useState('');
  const [selection,setSelection]=useState<string[]>(initialStudentId?[initialStudentId]:[]);
  const [classFilter,setClassFilter]=useState('');
  const [query,setQuery]=useState('');
+ const [examFilter,setExamFilter]=useState('');
+ const [examDraft,setExamDraft]=useState<string|null>(null);
  const [preview,setPreview]=useState('');
  const [error,setError]=useState('');
  const [message,setMessage]=useState('');
@@ -32,10 +35,16 @@ export default function RankCards({students,classes,template,mayEdit,onSave,load
  const [printMode,setPrintMode]=useState<'front'|'back'|'both'>('front');
  const currentTemplate=mayEdit&&draft?draft:saved;
  const effective=useMemo(()=>sideTemplate(currentTemplate,side),[currentTemplate,side]);
+ const exams=examSessionOptions(students);
+ const effectiveExamFilter=exams.includes(examFilter)?examFilter:'';
  const filtered=students.filter(s=>(!classFilter||s.data.classId===classFilter)&&
+  (!effectiveExamFilter||String(s.data.examSession??'').trim()===effectiveExamFilter)&&
   (String(s.data.name)+' '+String(s.data.id)).toLocaleLowerCase('vi').includes(query.trim().toLocaleLowerCase('vi')));
  const picked=students.filter(s=>selection.includes(s.id));
  const example=picked[0]??filtered[0];
+ const selectedExam=picked.length&&picked.every(s=>s.data.examSession===picked[0].data.examSession)?
+  String(picked[0].data.examSession??''):'';
+ const examValue=examDraft??selectedExam;
  const unlinked=picked.filter(s=>s.data.rankCard?.linked!==true);
  const className=classes.find(c=>c.id===example?.data.classId)?.data.name||'';
  const exampleId=example?.id??'';
@@ -92,6 +101,7 @@ export default function RankCards({students,classes,template,mayEdit,onSave,load
    {...current,back:{...(current.back??emptyBack()),image:prepared.image}}));
  }
  function toggle(id:string) {
+  setExamDraft(null);
   setSelection(previous=>previous.includes(id)?previous.filter(item=>item!==id):[...previous,id]);
  }
  function print() {
@@ -100,7 +110,7 @@ export default function RankCards({students,classes,template,mayEdit,onSave,load
    const current=await loadForPrint(picked.map(s=>s.id));
    const sides=printMode==='both'?(['front','back'] as const):[printMode];
    const templates=sides.map(face=>sideTemplate(current.template,face));
-   if(templates.some(face=>!rankCardPhotoFits({...face,back:undefined})))throw new Error('Khổ thẻ quá nhỏ để đặt ảnh 2 × 3 cm. Hãy tăng chiều cao thẻ hoặc ẩn ảnh.');
+   if(templates.some(face=>!rankCardPhotoFits({...face,back:undefined})))throw new Error('Kích thước ảnh lớn hơn khổ thẻ. Hãy chỉnh lại chiều rộng hoặc chiều cao ảnh.');
    if(templates.some(face=>!face.image))throw new Error('Hãy lưu phôi cho các mặt được chọn trước khi in.');
    const pages=templates.map(()=>[] as string[]);
    let withoutPhoto=0;
@@ -136,6 +146,17 @@ export default function RankCards({students,classes,template,mayEdit,onSave,load
   });
  }
 
+ function assignExam() {
+  const name=examValue.trim();
+  if(!onAssignExam||!picked.length||!name)return;
+  void run(async()=>{
+   const {saved,failures}=await onAssignExam(picked.map(student=>student.id),name);
+   setMessage('Đã cập nhật khóa thi cho '+saved+' hồ sơ võ sinh.');
+   if(failures.length)setError(failures.join(' · '));
+   else setExamDraft(null);
+  });
+ }
+
  return <section className="rank-cards">
   {error&&<p className="alert error" role="alert">{error}</p>}
   {message&&<p className="alert info" role="status">{message}</p>}
@@ -147,14 +168,28 @@ export default function RankCards({students,classes,template,mayEdit,onSave,load
       <label>Tìm theo tên hoặc mã<input value={query} onChange={e=>setQuery(e.target.value)}/></label>
       <label>Lọc lớp<select value={classFilter} onChange={e=>setClassFilter(e.target.value)}><option value="">Tất cả lớp được cấp</option>
        {classes.map(c=><option value={c.id} key={c.id}>{c.data.name}</option>)}</select></label>
+      {exams.length>0&&<label>Lọc khóa thi<select value={effectiveExamFilter} onChange={e=>setExamFilter(e.target.value)}>
+       <option value="">Tất cả khóa thi</option>{exams.map(exam=><option key={exam}>{exam}</option>)}
+      </select></label>}
      </div>
      <fieldset className="rank-card-roster" disabled={working}>
       <legend>Danh sách võ sinh</legend>
       {filtered.map(s=><label key={s.id}><input type="checkbox" checked={selection.includes(s.id)}
        disabled={!selection.includes(s.id)&&picked.length>=40} onChange={()=>toggle(s.id)}/>
-       <span>{s.data.name} <small>{s.data.id}{s.data.rankCard?.linked===true?' · Có thẻ trong hồ sơ':''}</small></span></label>)}
+       <span>{s.data.name} <small>{s.data.id}{s.data.examSession?' · '+s.data.examSession:''}{s.data.rankCard?.linked===true?' · Có thẻ trong hồ sơ':''}</small></span></label>)}
       {!filtered.length&&<p>Không tìm thấy võ sinh trong lớp đã chọn.</p>}
      </fieldset>
+     {onAssignExam&&<fieldset className="rank-card-visibility" disabled={working||!picked.length}>
+      <legend>Khóa thi của võ sinh đã chọn</legend>
+      <div className="rank-card-filters">
+       <label htmlFor="rank-card-exam">Chọn hoặc nhập khóa thi</label>
+       <input id="rank-card-exam" list="rank-card-exam-options" maxLength={120} value={examValue}
+        onChange={e=>setExamDraft(e.target.value)}/>
+       <datalist id="rank-card-exam-options">{exams.map(exam=><option key={exam} value={exam}/>)}</datalist>
+       <button type="button" className="secondary" disabled={!examValue.trim()||!picked.some(s=>s.data.examSession!==examValue.trim())}
+        onClick={assignExam}>Lưu khóa thi</button>
+      </div>
+     </fieldset>}
      <div className="rank-card-filters rank-card-print-mode"><label>Mặt cần in
       <select value={printMode} disabled={working} onChange={e=>setPrintMode(e.target.value as typeof printMode)}>
        <option value="front">Mặt trước</option><option value="back" disabled={!saved.back?.image}>Mặt sau</option>
@@ -164,7 +199,7 @@ export default function RankCards({students,classes,template,mayEdit,onSave,load
      <div className="rank-card-actions">
       <button className="primary" disabled={working||!!draft||!saved.image||(printMode!=='front'&&!saved.back?.image)||!picked.length} onClick={print}><Printer size={16}/> In thẻ đã chọn</button>
       {onLinkProfiles&&<button className="secondary" disabled={working||!!draft||!saved.image||!unlinked.length} onClick={linkProfiles}>Lưu thẻ vào hồ sơ</button>}
-      <button className="secondary" disabled={working||!picked.length} onClick={()=>setSelection([])}>Bỏ chọn</button>
+      <button className="secondary" disabled={working||!picked.length} onClick={()=>{setSelection([]);setExamDraft(null)}}>Bỏ chọn</button>
      </div>
     </div>
    </section>
@@ -179,7 +214,7 @@ export default function RankCards({students,classes,template,mayEdit,onSave,load
      </div>
      {effective.image&&preview?<img className="rank-card-preview" src={preview} alt="Bản xem trước thẻ với thông tin võ sinh"/>:
       <p>{effective.image?'Đang dựng bản xem trước…':'Chưa có phôi cho mặt này.'}</p>}
-     {effective.slots.photo.enabled&&effective.heightMm<30&&<p>Ảnh 2 × 3 cm cần chiều cao thẻ từ 30 mm. Tăng chiều cao hoặc ẩn ảnh trên mặt này.</p>}
+     {!rankCardPhotoFits({...effective,back:undefined})&&<p>Kích thước ảnh lớn hơn khổ thẻ trên mặt này.</p>}
      {photo?.unavailable&&<p>Ảnh đại diện của hồ sơ xem trước chưa tải được.</p>}
      {draft&&mayEdit&&<div className="rank-card-editor">
       <label>Ảnh phôi {side==='front'?'mặt trước':'mặt sau'} (JPG, PNG hoặc WebP)<input type="file" accept="image/jpeg,image/png,image/webp" disabled={working} onChange={e=>{
@@ -192,13 +227,13 @@ export default function RankCards({students,classes,template,mayEdit,onSave,load
         onChange={e=>setDraft({...draft,heightMm:Number(e.target.value)})}/></label>
 
       </div>
-      <RankCardFields key={side} side={effective} heightMm={draft.heightMm} color={draft.color} onChange={changeSide}/>
+      <RankCardFields key={side} side={effective} widthMm={draft.widthMm} heightMm={draft.heightMm} color={draft.color} onChange={changeSide}/>
       {side==='back'&&effective.image&&<button className="secondary" disabled={working} onClick={()=>changeSide({...effective,image:''})}>Bỏ ảnh phôi mặt sau</button>}
       <div className="rank-card-actions">
        <button className="primary" disabled={working||!draft.image} onClick={()=>run(async()=>{
         const next=normalizeCard(draft);
         if(next.widthMm!==draft.widthMm||next.heightMm!==draft.heightMm)throw new Error('Chiều rộng 30–190 mm và chiều cao 20–270 mm.');
-        if(!rankCardPhotoFits(next))throw new Error('Khổ thẻ có ảnh 2 × 3 cm phải cao ít nhất 30 mm. Hãy tăng chiều cao hoặc ẩn ảnh.');
+        if(!rankCardPhotoFits(next))throw new Error('Kích thước ảnh lớn hơn khổ thẻ. Hãy chỉnh lại chiều rộng hoặc chiều cao ảnh trước khi lưu.');
         await onSave(next,original);setDraft(null);if(!next.back?.image)setPrintMode('front');setMessage('Đã lưu phôi thẻ dùng chung.');
        })}>Lưu phôi và vị trí</button>
        <button className="secondary" disabled={working} onClick={()=>setDraft(null)}>Hủy chỉnh sửa</button>

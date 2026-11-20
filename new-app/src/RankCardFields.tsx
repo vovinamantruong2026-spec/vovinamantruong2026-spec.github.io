@@ -1,5 +1,5 @@
 import {useId,useState} from 'react';
-import {cardFields,cardKeys,extraLimit,extraSources,newExtraSlot,type CardField,type CardSide,type ExtraField,type ExtraSource,type Slot} from './rank-card';
+import {cardFields,cardKeys,extraLimit,extraSources,newExtraSlot,photoSizeMm,type CardField,type CardSide,type ExtraField,type ExtraSource,type Slot} from './rank-card';
 
 type NumericControlProps={
  label:string; unit:'%'|'mm'; min:number; max:number; value:number; onChange:(value:number)=>void;
@@ -40,8 +40,8 @@ function NumericControl({label,unit,min,max,value,onChange}:NumericControlProps)
  </div>;
 }
 
-type Props={side:CardSide;heightMm:number;color:string;onChange:(side:CardSide)=>void};
-export default function RankCardFields({side,heightMm,color,onChange}:Props) {
+type Props={side:CardSide;widthMm:number;heightMm:number;color:string;onChange:(side:CardSide)=>void};
+export default function RankCardFields({side,widthMm,heightMm,color,onChange}:Props) {
  const [selected,setSelected]=useState('name');
  const extras=side.extras??[];
  const builtin=cardKeys.find(key=>key===selected);
@@ -96,7 +96,10 @@ export default function RankCardFields({side,heightMm,color,onChange}:Props) {
   <div className="rank-card-filters" key={field?.id??key}>
    <NumericControl label="Từ trái" unit="%" min={0} max={95} value={slot.x} onChange={x=>changeSlot({x})}/>
    <NumericControl label="Từ trên" unit="%" min={0} max={95} value={slot.y} onChange={y=>changeSlot({y})}/>
-   {isPhoto?<p>Ảnh hồ sơ tự đồng bộ, cắt theo khổ dọc 2 × 3 cm.</p>:
+   {isPhoto?<>
+    <NumericControl label="Chiều rộng ảnh" unit="mm" min={1} max={Math.max(1,widthMm)} value={photoSizeMm(slot).width} onChange={photoWidthMm=>changeSlot({photoWidthMm})}/>
+    <NumericControl label="Chiều cao ảnh" unit="mm" min={1} max={Math.max(1,heightMm)} value={photoSizeMm(slot).height} onChange={photoHeightMm=>changeSlot({photoHeightMm})}/>
+   </>:
    <>
     <NumericControl label="Rộng tối đa" unit="%" min={3} max={100} value={slot.width??Math.round(98-slot.x)} onChange={width=>changeSlot({width})}/>
     <NumericControl label="Cỡ chữ" unit="mm" min={0.5} max={20} value={slot.fontMm??Math.max(0.5,Math.round(heightMm*slot.size/10)/10)} onChange={fontMm=>changeSlot({fontMm})}/>
