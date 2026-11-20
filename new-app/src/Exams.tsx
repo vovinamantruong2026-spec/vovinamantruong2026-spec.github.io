@@ -1,5 +1,6 @@
 import {useState} from 'react';
 import type {ExamDetails} from './exam-award';
+import {VOVINAM_BELTS} from './vovinam';
 
 type Rec={kind:string;id:string;data:any;version:number};
 export type Entry={studentUid:string;name:string;code:string;fee:number;paid:boolean;result:'pending'|'pass'|'fail';belt?:string;revokedBelt?:string;previousBelt?:string};
@@ -93,7 +94,7 @@ export default function Exams({records,students,save,pending,sync}:{
     }
     const valid=entries.every(row=>Number.isSafeInteger(row.fee)&&row.fee>=0&&
      (row.result!=='pass'||Boolean(row.belt?.trim())));
-    if(!valid){failures.push(className(r.data.classId)+': kiểm tra lệ phí và cấp đai đạt.');continue}
+    if(!valid){failures.push(className(r.data.classId)+': kiểm tra lệ phí và cấp đai thi.');continue}
     const saved=edit?await save('tournament',r.id,{...r.data,entries},edit.version):r;
     if(!saved){failures.push(className(r.data.classId)+': chưa lưu được danh sách.');continue}
     if(edit)setDraft(current=>{const next={...current};delete next[r.id];return next});
@@ -165,7 +166,7 @@ export default function Exams({records,students,save,pending,sync}:{
      })}{!candidates.length&&<p>Không có võ sinh phù hợp.</p>}</div>
     </details>
     <h3>Danh sách võ sinh đã chọn ({visibleRows.length})</h3>
-    <div className="table-wrap"><table><thead><tr><th>STT</th><th>Võ sinh</th><th>Lớp</th><th>Kết quả</th><th>Cấp đai đạt</th><th>Lệ phí (đ)</th><th>Đóng lệ phí</th><th/></tr></thead><tbody>{visibleRows.map(({r,entry},index)=>{
+    <div className="table-wrap"><table><thead><tr><th>STT</th><th>Võ sinh</th><th>Lớp</th><th>Kết quả</th><th>Cấp đai thi</th><th>Lệ phí (đ)</th><th>Đóng lệ phí</th><th/></tr></thead><tbody>{visibleRows.map(({r,entry},index)=>{
      const list:Entry[]=draft[r.id]?.entries??savedEntries(r);
      const edit=(patch:Partial<Entry>)=>update(r,list.map(row=>row.studentUid===entry.studentUid?{...row,...patch}:row));
      const previous=savedByRoster.get(r.id)?.find(row=>row.studentUid===entry.studentUid);
@@ -179,7 +180,13 @@ export default function Exams({records,students,save,pending,sync}:{
       <td><select disabled={!sync&&entry.result==='pass'} aria-label={'Kết quả '+entry.name} value={entry.result} onChange={e=>edit({result:e.target.value as Entry['result']})}>
        <option value="pending">Chưa có kết quả</option><option value="pass" disabled={!sync}>Đỗ</option><option value="fail">Trượt</option>
       </select></td>
-      <td><input aria-label={'Cấp đai đạt '+entry.name} maxLength={80} placeholder="Nhập cấp đai" value={entry.belt??''} onChange={e=>edit({belt:e.target.value})}/>
+      <td><select aria-label={'Cấp đai thi '+entry.name} value={entry.belt??''}
+        onChange={e=>edit({belt:e.target.value})}>
+        <option value="">Chọn cấp đai thi</option>
+        {entry.belt&&!VOVINAM_BELTS.some(belt=>belt===entry.belt)&&
+         <option value={entry.belt} disabled>{entry.belt} (đã lưu)</option>}
+        {VOVINAM_BELTS.map(belt=><option key={belt} value={belt}>{belt}</option>)}
+       </select>
        {legacyCorrection&&<label>Cấp đai trước khóa thi cũ<input required maxLength={80}
         value={entry.previousBelt??''} onChange={e=>edit({previousBelt:e.target.value})}/></label>}</td>
       <td><input aria-label={'Lệ phí '+entry.name} type="number" min="0" step="1" required value={Number.isNaN(entry.fee)?'':entry.fee} onChange={e=>edit({fee:e.target.valueAsNumber})}/></td>

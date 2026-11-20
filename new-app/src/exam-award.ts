@@ -42,7 +42,7 @@ export function examAwardPatch(profile:Profile,examId:string,exam:ExamDetails,en
  if(entry.result==='pass'){
   if(!exam.name||!exam.organization||!exam.date)throw new Error('Bổ sung đơn vị và ngày thi trong cài đặt khóa thi.');
   const belt=entry.belt?.trim();
-  if(!belt)throw new Error('Nhập cấp đai đạt.');
+  if(!belt)throw new Error('Chọn cấp đai thi.');
   if(current.examDate>exam.date||(tracked&&index>=0&&index<awards.length-1))return null;
   const awarded={examSession:exam.name,examDate:exam.date,organization:exam.organization,belt};
   if(same(awarded,current))return null;
