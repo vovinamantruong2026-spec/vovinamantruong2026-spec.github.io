@@ -1,10 +1,11 @@
+import {birthYear} from './student-duplicates';
 export function rankCardAllowed(actor: {isSuperAdmin?:boolean; permissions?:Record<string,boolean>}|null|undefined, edit=false) {
  const grants=actor?.permissions;
  return actor?.isSuperAdmin===true || (grants?.rank_cards_manage===true && grants.reports_export===true &&
   (!edit || grants.settings_manage===true));
 }
 export const cardFields = {
- name:'Họ và tên', code:'Mã võ sinh', dob:'Ngày sinh', belt:'Cấp đai', className:'Lớp học',
+ name:'Họ và tên', code:'Mã võ sinh', dob:'Năm sinh', belt:'Cấp đai', className:'Lớp học',
  examSession:'Khóa thi', organization:'Đơn vị', examDate:'Ngày thi', photo:'Ảnh đại diện',
 } as const;
 export type CardField = keyof typeof cardFields;
@@ -129,10 +130,9 @@ export function examSessionOptions(students:readonly {data:{examSession?:unknown
 }
 
 export function studentCardValues(data:any,className:string): Record<Exclude<CardField,'photo'>,string> {
- const dob=String(data.dob || '');
  return {
   name:String(data.name || ''), code:String(data.id || ''),
-  dob:/^\d{4}-\d{2}-\d{2}$/.test(dob)?dob.split('-').reverse().join('/'):dob,
+  dob:birthYear(data.dob),
   belt:String(data.belt || ''), className,
   examSession:String(data.examSession ?? ''), organization:String(data.organization ?? ''),
   examDate:String(data.examDate ?? '').split('-').reverse().join('/'),
