@@ -4,7 +4,8 @@ export function rankCardAllowed(actor: {isSuperAdmin?:boolean; permissions?:Reco
   (!edit || grants.settings_manage===true));
 }
 export const cardFields = {
- name:'Họ và tên', code:'Mã võ sinh', dob:'Ngày sinh', belt:'Cấp đai', className:'Lớp học', photo:'Ảnh đại diện',
+ name:'Họ và tên', code:'Mã võ sinh', dob:'Ngày sinh', belt:'Cấp đai', className:'Lớp học',
+ examSession:'Khóa thi', organization:'Đơn vị', photo:'Ảnh đại diện',
 } as const;
 export type CardField = keyof typeof cardFields;
 export type Slot = {enabled:boolean; x:number; y:number; size:number; width?:number; fontMm?:number; color?:string};
@@ -30,6 +31,8 @@ export const defaultCard: RankCardTemplate = {
   dob:{enabled:true,x:35,y:60,size:5},
   belt:{enabled:true,x:35,y:72,size:5},
   className:{enabled:true,x:35,y:84,size:5},
+  examSession:{enabled:false,x:35,y:19,size:5},
+  organization:{enabled:false,x:35,y:27,size:5},
   photo:{enabled:true,x:7,y:36,size:23},
  },
 };
@@ -120,6 +123,7 @@ export function studentCardValues(data:any,className:string): Record<Exclude<Car
   name:String(data.name || ''), code:String(data.id || ''),
   dob:/^\d{4}-\d{2}-\d{2}$/.test(dob)?dob.split('-').reverse().join('/'):dob,
   belt:String(data.belt || ''), className,
+  examSession:String(data.examSession ?? ''), organization:String(data.organization ?? ''),
  };
 }
 
