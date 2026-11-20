@@ -65,3 +65,5 @@
 .exam-panel details, .exam-panel fieldset, .exam-panel .table-wrap { margin-block:.75rem; }
 .exam-panel fieldset { min-width:0; }
 .exam-panel td input { width:8rem; }
+.exam-panel label.exam-choice { display:flex; align-items:center; }
+.exam-panel label.exam-choice input { width:auto; }
