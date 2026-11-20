@@ -6,7 +6,8 @@ export function rankCardAllowed(actor: {isSuperAdmin?:boolean; permissions?:Reco
 }
 export const cardFields = {
  name:'Họ và tên', code:'Mã võ sinh', dob:'Năm sinh', belt:'Cấp đai', className:'Lớp học',
- examSession:'Khóa thi', organization:'Đơn vị', examDate:'Ngày thi', photo:'Ảnh đại diện',
+ examSession:'Khóa thi', organization:'Đơn vị', examDate:'Ngày thi (đầy đủ)',
+ examDay:'Ngày thi', examMonth:'Tháng thi', examYear:'Năm thi', photo:'Ảnh đại diện',
 } as const;
 export type CardField = keyof typeof cardFields;
 export type Slot = {enabled:boolean; x:number; y:number; size:number; width?:number; fontMm?:number; color?:string; photoWidthMm?:number; photoHeightMm?:number};
@@ -35,6 +36,9 @@ export const defaultCard: RankCardTemplate = {
   examSession:{enabled:false,x:35,y:19,size:5},
   organization:{enabled:false,x:35,y:27,size:5},
   examDate:{enabled:false,x:35,y:92,size:5},
+  examDay:{enabled:false,x:35,y:92,size:5},
+  examMonth:{enabled:false,x:47,y:92,size:5},
+  examYear:{enabled:false,x:59,y:92,size:5},
   photo:{enabled:true,x:7,y:36,size:23},
  },
 };
@@ -130,12 +134,15 @@ export function examSessionOptions(students:readonly {data:{examSession?:unknown
 }
 
 export function studentCardValues(data:any,className:string): Record<Exclude<CardField,'photo'>,string> {
+ const examDate=String(data.examDate ?? '');
+ const [,examYear='',examMonth='',examDay='']=/^(\d{4})-(\d{2})-(\d{2})$/.exec(examDate)??[];
  return {
   name:String(data.name || ''), code:String(data.id || ''),
   dob:birthYear(data.dob),
   belt:String(data.belt || ''), className,
   examSession:String(data.examSession ?? ''), organization:String(data.organization ?? ''),
-  examDate:String(data.examDate ?? '').split('-').reverse().join('/'),
+  examDate:examDate.split('-').reverse().join('/'),
+  examDay, examMonth, examYear,
  };
 }
 
