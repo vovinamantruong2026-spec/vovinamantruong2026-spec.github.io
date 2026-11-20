@@ -8,7 +8,6 @@ type Row={id:string;data:any};
 type Props={
  students:Row[]; classes:Row[]; template?:RankCardTemplate; mayEdit:boolean; initialStudentId?:string;
  onLinkProfiles?:(ids:string[])=>Promise<{saved:number; failures:string[]}>;
- onAssignExam?:(ids:string[],value:string)=>Promise<{saved:number;failures:string[]}>;
  onSave:(template:RankCardTemplate,previous:string)=>Promise<void>;
  loadForPrint:(ids:string[])=>Promise<{students:Row[];classes:Row[];template:RankCardTemplate}>;
 };
@@ -18,7 +17,7 @@ async function photoFor(student:Row,signal?:AbortSignal) {
  return typeof id==='string' && id ? fetchStudentFile(student.id,id,signal) : undefined;
 }
 
-export default function RankCards({students,classes,template,mayEdit,onSave,loadForPrint,initialStudentId,onLinkProfiles,onAssignExam}:Props) {
+export default function RankCards({students,classes,template,mayEdit,onSave,loadForPrint,initialStudentId,onLinkProfiles}:Props) {
  const saved=useMemo(()=>normalizeCard(template),[template]);
  const [draft,setDraft]=useState<RankCardTemplate|null>(null);
  const [original,setOriginal]=useState('');
@@ -26,7 +25,6 @@ export default function RankCards({students,classes,template,mayEdit,onSave,load
  const [classFilter,setClassFilter]=useState('');
  const [query,setQuery]=useState('');
  const [examFilter,setExamFilter]=useState('');
- const [examDraft,setExamDraft]=useState<string|null>(null);
  const [preview,setPreview]=useState('');
  const [error,setError]=useState('');
  const [message,setMessage]=useState('');
@@ -42,9 +40,6 @@ export default function RankCards({students,classes,template,mayEdit,onSave,load
   (String(s.data.name)+' '+String(s.data.id)).toLocaleLowerCase('vi').includes(query.trim().toLocaleLowerCase('vi')));
  const picked=students.filter(s=>selection.includes(s.id));
  const example=picked[0]??filtered[0];
- const selectedExam=picked.length&&picked.every(s=>s.data.examSession===picked[0].data.examSession)?
-  String(picked[0].data.examSession??''):'';
- const examValue=examDraft??selectedExam;
  const unlinked=picked.filter(s=>s.data.rankCard?.linked!==true);
  const className=classes.find(c=>c.id===example?.data.classId)?.data.name||'';
  const exampleId=example?.id??'';
@@ -101,7 +96,6 @@ export default function RankCards({students,classes,template,mayEdit,onSave,load
    {...current,back:{...(current.back??emptyBack()),image:prepared.image}}));
  }
  function toggle(id:string) {
-  setExamDraft(null);
   setSelection(previous=>previous.includes(id)?previous.filter(item=>item!==id):[...previous,id]);
  }
  function print() {
@@ -146,17 +140,6 @@ export default function RankCards({students,classes,template,mayEdit,onSave,load
   });
  }
 
- function assignExam() {
-  const name=examValue.trim();
-  if(!onAssignExam||!picked.length||!name)return;
-  void run(async()=>{
-   const {saved,failures}=await onAssignExam(picked.map(student=>student.id),name);
-   setMessage('Đã cập nhật khóa thi cho '+saved+' hồ sơ võ sinh.');
-   if(failures.length)setError(failures.join(' · '));
-   else setExamDraft(null);
-  });
- }
-
  return <section className="rank-cards">
   {error&&<p className="alert error" role="alert">{error}</p>}
   {message&&<p className="alert info" role="status">{message}</p>}
@@ -179,17 +162,6 @@ export default function RankCards({students,classes,template,mayEdit,onSave,load
        <span>{s.data.name} <small>{s.data.id}{s.data.examSession?' · '+s.data.examSession:''}{s.data.rankCard?.linked===true?' · Có thẻ trong hồ sơ':''}</small></span></label>)}
       {!filtered.length&&<p>Không tìm thấy võ sinh trong lớp đã chọn.</p>}
      </fieldset>
-     {onAssignExam&&<fieldset className="rank-card-visibility" disabled={working||!picked.length}>
-      <legend>Khóa thi của võ sinh đã chọn</legend>
-      <div className="rank-card-filters">
-       <label htmlFor="rank-card-exam">Chọn hoặc nhập khóa thi</label>
-       <input id="rank-card-exam" list="rank-card-exam-options" maxLength={120} value={examValue}
-        onChange={e=>setExamDraft(e.target.value)}/>
-       <datalist id="rank-card-exam-options">{exams.map(exam=><option key={exam} value={exam}/>)}</datalist>
-       <button type="button" className="secondary" disabled={!examValue.trim()||!picked.some(s=>s.data.examSession!==examValue.trim())}
-        onClick={assignExam}>Lưu khóa thi</button>
-      </div>
-     </fieldset>}
      <div className="rank-card-filters rank-card-print-mode"><label>Mặt cần in
       <select value={printMode} disabled={working} onChange={e=>setPrintMode(e.target.value as typeof printMode)}>
        <option value="front">Mặt trước</option><option value="back" disabled={!saved.back?.image}>Mặt sau</option>
@@ -199,7 +171,7 @@ export default function RankCards({students,classes,template,mayEdit,onSave,load
      <div className="rank-card-actions">
       <button className="primary" disabled={working||!!draft||!saved.image||(printMode!=='front'&&!saved.back?.image)||!picked.length} onClick={print}><Printer size={16}/> In thẻ đã chọn</button>
       {onLinkProfiles&&<button className="secondary" disabled={working||!!draft||!saved.image||!unlinked.length} onClick={linkProfiles}>Lưu thẻ vào hồ sơ</button>}
-      <button className="secondary" disabled={working||!picked.length} onClick={()=>{setSelection([]);setExamDraft(null)}}>Bỏ chọn</button>
+      <button className="secondary" disabled={working||!picked.length} onClick={()=>{setSelection([])}}>Bỏ chọn</button>
      </div>
     </div>
    </section>

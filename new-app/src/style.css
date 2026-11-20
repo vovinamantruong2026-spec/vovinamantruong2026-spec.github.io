@@ -60,3 +60,8 @@
 .gear-picker{max-height:180px;overflow:auto;border:1px solid #dce5ef;border-radius:8px;padding:8px}
 .gear-picker .checkbox{min-height:36px}
 .gear-status .badge.amber{background:#fff1ce;color:#765207}
+
+.exam-panel label { display:grid; gap:.35rem; margin-block:.5rem; }
+.exam-panel details, .exam-panel fieldset, .exam-panel .table-wrap { margin-block:.75rem; }
+.exam-panel fieldset { min-width:0; }
+.exam-panel td input { width:8rem; }
